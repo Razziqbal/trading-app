@@ -51,6 +51,23 @@ button.primary{
   font-size:15px;letter-spacing:.02em;cursor:pointer;margin-top:6px
 }
 button.primary:disabled{opacity:.45}
+button.primary.alt{background:var(--surface2);color:var(--text);border:1px solid var(--line);margin-top:8px}
+
+/* ---- scan board ---- */
+.scanboard{margin-top:14px}
+.scanrow{
+  display:grid;grid-template-columns:86px 1fr auto;align-items:center;gap:10px;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;
+  padding:13px 14px;margin-bottom:8px;cursor:pointer
+}
+.scanrow .sym{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600}
+.scanrow .info{font-size:11px;color:var(--muted)}
+.scanrow .tag{font-weight:800;font-size:13px;letter-spacing:.03em;padding:5px 12px;border-radius:999px}
+.scanrow .tag.buy{background:var(--buy-dim);color:var(--buy)}
+.scanrow .tag.sell{background:var(--sell-dim);color:var(--sell)}
+.scanrow .tag.hold{background:var(--hold-dim);color:var(--hold)}
+.scanrow.err-row .tag{background:none;color:var(--faint);border:1px solid var(--line)}
+.scanhint{font-size:11px;color:var(--faint);text-align:center;margin:4px 0 2px}
 button.ghost{
   padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:none;
   color:var(--muted);font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer
@@ -150,6 +167,7 @@ nav button.on .dot{background:var(--buy)}
   <div class="chips" id="pairChips"></div>
   <div class="chips" id="tfChips" style="margin-top:8px"></div>
   <button class="primary" id="analyseBtn">Analyse</button>
+  <button class="primary alt" id="scanBtn">Scan focus pairs</button>
   <div id="signalOut"></div>
 </div>
 
@@ -207,6 +225,8 @@ const PAIRS = [
   { sym:'XAU/USD', dp:2, pip:0.1,    unit:'pts'  },
   { sym:'XAG/USD', dp:3, pip:0.01,   unit:'pts'  }
 ];
+/* Focus pairs scanned by the "Scan focus pairs" button */
+const FOCUS = ['GBP/JPY','XAU/USD','USD/JPY','EUR/USD'];
 const TFS = ['5min','15min','1h'];
 let selPair = store.get('pair') || 'EUR/USD';
 let selTf   = store.get('tf')   || '15min';
@@ -514,6 +534,60 @@ document.querySelectorAll('nav button').forEach(b=>{
   };
 });
 document.getElementById('analyseBtn').onclick = analyse;
+
+/* ---------- multi-pair scan ---------- */
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+const scanCache = {};
+
+async function scanAll(){
+  const key = store.get('apiKey');
+  const out = document.getElementById('signalOut');
+  if (!key){ out.innerHTML = `<div class="err">Add your Twelve Data API key on the Settings tab first.</div>`; return; }
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  out.innerHTML = `<div class="scanboard" id="scanboard"><div class="scanhint">Scanning ${FOCUS.length} pairs on ${selTf}…</div></div>`;
+  const board = document.getElementById('scanboard');
+
+  for (let i=0; i<FOCUS.length; i++){
+    const sym = FOCUS[i];
+    const pair = PAIRS.find(p=>p.sym===sym);
+    btn.innerHTML = `<span class="spin"></span>${sym} (${i+1}/${FOCUS.length})`;
+    try{
+      const candles = await fetchCandles(sym, selTf, key);
+      const sig = buildSignal(candles, getRR());
+      scanCache[sym] = { candles, sig };
+      const info = sig.dir==='hold'
+        ? `${sig.trend}trend · cross ${sig.barsSince} bars ago`
+        : `fresh cross · ${sig.barsSince} bar${sig.barsSince===1?'':'s'} ago`;
+      board.insertAdjacentHTML('beforeend', `
+        <div class="scanrow" onclick="openScan('${sym}')">
+          <span class="sym">${sym}</span>
+          <span class="info">${sig.price.toFixed(pair.dp)} · ${info}</span>
+          <span class="tag ${sig.dir}">${sig.verdict}</span>
+        </div>`);
+    }catch(e){
+      board.insertAdjacentHTML('beforeend', `
+        <div class="scanrow err-row">
+          <span class="sym">${sym}</span>
+          <span class="info">${e.message}</span>
+          <span class="tag">—</span>
+        </div>`);
+    }
+    if (i < FOCUS.length-1) await sleep(400);
+  }
+  board.insertAdjacentHTML('beforeend', `<div class="scanhint">Tap a pair for the chart, levels and journal logging.</div>`);
+  btn.disabled = false; btn.textContent = 'Scan focus pairs';
+}
+
+function openScan(sym){
+  const hit = scanCache[sym];
+  if (!hit) return;
+  selPair = sym; store.set('pair', sym); renderChips();
+  window.__candles = hit.candles;
+  renderSignal(hit.sig, PAIRS.find(p=>p.sym===sym));
+  window.scrollTo({top:0});
+}
+document.getElementById('scanBtn').onclick = scanAll;
 renderChips(); initSettings(); renderJournal();
 </script>
 </body>
