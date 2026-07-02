@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Crossover — 9/15 EMA Signals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E1116; --surface:#171C23; --surface2:#1D242E; --line:#242D38;
+  --text:#E8EDF2; --muted:#8A96A3; --faint:#5A6675;
+  --buy:#2DD4A7; --sell:#FF6B5E; --hold:#E8B84B;
+  --buy-dim:rgba(45,212,167,.12); --sell-dim:rgba(255,107,94,.12); --hold-dim:rgba(232,184,75,.12);
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:'Archivo',system-ui,-apple-system,sans-serif;
+  font-size:15px; line-height:1.45;
+  padding-bottom:calc(64px + env(safe-area-inset-bottom));
+}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+
+header{padding:18px 16px 10px;display:flex;align-items:baseline;justify-content:space-between}
+header h1{font-size:17px;font-weight:800;letter-spacing:.02em}
+header h1 span{color:var(--buy)}
+.sub{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em}
+
+.page{display:none;padding:0 16px 24px}
+.page.active{display:block}
+
+/* ---- controls ---- */
+.row{display:flex;gap:8px;margin-bottom:10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;padding:10px 14px;border-radius:999px;border:1px solid var(--line);
+  background:var(--surface);color:var(--muted);font-family:'IBM Plex Mono',monospace;
+  font-size:13px;font-weight:500;cursor:pointer
+}
+.chip.on{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
+.chip.tf{padding:8px 12px;font-size:12px}
+button.primary{
+  width:100%;padding:15px;border:none;border-radius:var(--radius);
+  background:var(--text);color:var(--bg);font-family:'Archivo';font-weight:800;
+  font-size:15px;letter-spacing:.02em;cursor:pointer;margin-top:6px
+}
+button.primary:disabled{opacity:.45}
+button.ghost{
+  padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:none;
+  color:var(--muted);font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer
+}
+
+/* ---- verdict card + price ladder (signature) ---- */
+.verdict{border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);overflow:hidden;margin-top:14px}
+.verdict-head{padding:16px;display:flex;justify-content:space-between;align-items:center}
+.verdict-tag{font-size:26px;font-weight:800;letter-spacing:.01em}
+.verdict-tag.buy{color:var(--buy)} .verdict-tag.sell{color:var(--sell)} .verdict-tag.hold{color:var(--hold)}
+.verdict-why{font-size:12px;color:var(--muted);max-width:52%;text-align:right}
+.verdict.buy .verdict-head{background:var(--buy-dim)}
+.verdict.sell .verdict-head{background:var(--sell-dim)}
+.verdict.hold .verdict-head{background:var(--hold-dim)}
+
+.ladder{padding:6px 16px 14px}
+.rung{display:grid;grid-template-columns:74px 1fr auto;align-items:center;padding:11px 0;border-bottom:1px dashed var(--line)}
+.rung:last-child{border-bottom:none}
+.rung .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700}
+.rung .price{font-size:19px;font-weight:600}
+.rung .dist{font-size:11px;color:var(--muted);text-align:right}
+.rung.tp .price{color:var(--buy)} .rung.sl .price{color:var(--sell)}
+.rung.entry .price{color:var(--text);font-size:22px}
+
+.meta{display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap}
+.pill{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px}
+.logbtn{margin:0 16px 16px;width:calc(100% - 32px)}
+
+/* ---- chart ---- */
+.chartwrap{margin-top:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:12px 8px 6px}
+.chartwrap .cap{display:flex;justify-content:space-between;padding:0 8px 6px;font-size:11px;color:var(--faint)}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:4px}
+svg{display:block;width:100%}
+
+/* ---- journal ---- */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center}
+.stat b{display:block;font-size:20px;font-weight:600;font-family:'IBM Plex Mono',monospace}
+.stat span{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em}
+.trade{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.trade .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.trade .dir{font-weight:800;font-size:14px}
+.trade .dir.buy{color:var(--buy)} .trade .dir.sell{color:var(--sell)}
+.trade .when{font-size:11px;color:var(--faint)}
+.trade .lvls{font-size:12px;color:var(--muted);margin-bottom:8px}
+.outcomes{display:flex;gap:6px}
+.outcomes button{flex:1;padding:9px 0;border-radius:9px;border:1px solid var(--line);background:none;color:var(--muted);font-size:12px;font-weight:700;font-family:'Archivo';cursor:pointer}
+.outcomes .w{color:var(--buy);border-color:rgba(45,212,167,.4)}
+.outcomes .l{color:var(--sell);border-color:rgba(255,107,94,.4)}
+.badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
+.badge.win{background:var(--buy-dim);color:var(--buy)}
+.badge.loss{background:var(--sell-dim);color:var(--sell)}
+.badge.be{background:var(--hold-dim);color:var(--hold)}
+.empty{color:var(--faint);text-align:center;padding:36px 12px;font-size:13px}
+.paper{font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
+.paper b{color:var(--text)}
+
+/* ---- settings ---- */
+label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:16px 0 6px}
+input[type=text],select{
+  width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);
+  background:var(--surface);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:14px
+}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.note a{color:var(--buy)}
+.warn{margin-top:18px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);padding-top:14px}
+
+/* ---- tab bar ---- */
+nav{
+  position:fixed;bottom:0;left:0;right:0;display:flex;
+  background:rgba(14,17,22,.92);backdrop-filter:blur(12px);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)
+}
+nav button{
+  flex:1;padding:12px 0 10px;background:none;border:none;color:var(--faint);
+  font-family:'Archivo';font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer
+}
+nav button.on{color:var(--text)}
+nav button .dot{display:block;width:4px;height:4px;border-radius:50%;background:transparent;margin:4px auto 0}
+nav button.on .dot{background:var(--buy)}
+
+.err{margin-top:14px;background:var(--sell-dim);border:1px solid rgba(255,107,94,.35);color:#FFB1A8;border-radius:12px;padding:12px;font-size:13px}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--bg);border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation:none}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>CROSSOVER<span>.</span></h1>
+  <div class="sub">9/15 EMA · paper trading</div>
+</header>
+
+<!-- ================= SIGNAL ================= -->
+<div class="page active" id="page-signal">
+  <div class="chips" id="pairChips"></div>
+  <div class="chips" id="tfChips" style="margin-top:8px"></div>
+  <button class="primary" id="analyseBtn">Analyse</button>
+  <div id="signalOut"></div>
+</div>
+
+<!-- ================= JOURNAL ================= -->
+<div class="page" id="page-journal">
+  <div class="paper" id="paperProgress"></div>
+  <div class="stats" id="statsRow"></div>
+  <div id="tradeList"></div>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="page" id="page-settings">
+  <label>Twelve Data API key</label>
+  <input type="text" id="apiKey" placeholder="Paste your free API key" autocomplete="off">
+  <p class="note">Get a free key at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com</a> — the free tier covers all five pairs, 8 requests/minute.</p>
+
+  <label>Risk : reward</label>
+  <select id="rrSelect">
+    <option value="1.5">1 : 1.5</option>
+    <option value="2">1 : 2</option>
+  </select>
+  <p class="note">Stop loss is 1.5 × ATR(14) from entry. Take profit is the stop distance × your R:R.</p>
+
+  <label>Paper trading start date</label>
+  <input type="text" id="startDate" placeholder="YYYY-MM-DD">
+  <p class="note">Used to track your 4–6 month evaluation window on the Journal tab.</p>
+
+  <button class="primary" id="saveSettings">Save settings</button>
+  <div class="warn">Signals are generated mechanically from the 9/15 EMA crossover and are not financial advice. This tool is for paper trading and strategy evaluation only.</div>
+</div>
+
+<nav>
+  <button class="on" data-page="signal">SIGNAL<span class="dot"></span></button>
+  <button data-page="journal">JOURNAL<span class="dot"></span></button>
+  <button data-page="settings">SETTINGS<span class="dot"></span></button>
+</nav>
+
+<script>
+/* ---------- safe storage (works hosted; degrades in sandboxes) ---------- */
+const mem = {};
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return mem[k] ?? null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){ mem[k]=v; } }
+};
+
+/* ---------- config ---------- */
+const PAIRS = [
+  { sym:'EUR/USD', dp:5, pip:0.0001, unit:'pips' },
+  { sym:'GBP/USD', dp:5, pip:0.0001, unit:'pips' },
+  { sym:'GBP/JPY', dp:3, pip:0.01,   unit:'pips' },
+  { sym:'XAU/USD', dp:2, pip:0.1,    unit:'pts'  },
+  { sym:'XAG/USD', dp:3, pip:0.01,   unit:'pts'  }
+];
+const TFS = ['5min','15min','1h'];
+let selPair = store.get('pair') || 'EUR/USD';
+let selTf   = store.get('tf')   || '15min';
+
+/* ---------- indicators ---------- */
+function ema(vals, p){
+  const out = new Array(vals.length).fill(null);
+  if (vals.length < p) return out;
+  let s = 0; for (let i=0;i<p;i++) s += vals[i];
+  out[p-1] = s/p;
+  const k = 2/(p+1);
+  for (let i=p;i<vals.length;i++) out[i] = vals[i]*k + out[i-1]*(1-k);
+  return out;
+}
+function atr(c, p=14){
+  const out = new Array(c.length).fill(null);
+  if (c.length < p+1) return out;
+  const tr = [null];
+  for (let i=1;i<c.length;i++){
+    tr.push(Math.max(
+      c[i].h - c[i].l,
+      Math.abs(c[i].h - c[i-1].c),
+      Math.abs(c[i].l - c[i-1].c)
+    ));
+  }
+  let s=0; for (let i=1;i<=p;i++) s += tr[i];
+  out[p] = s/p;
+  for (let i=p+1;i<c.length;i++) out[i] = (out[i-1]*(p-1) + tr[i]) / p;
+  return out;
+}
+
+/* ---------- signal engine ---------- */
+function buildSignal(candles, rr){
+  const closes = candles.map(c=>c.c);
+  const e9  = ema(closes, 9);
+  const e15 = ema(closes, 15);
+  const a   = atr(candles, 14);
+  const n = candles.length - 1;
+
+  // find most recent crossover
+  let crossIdx = -1, crossDir = 0;
+  for (let i=n; i>15; i--){
+    const now  = Math.sign(e9[i]  - e15[i]);
+    const prev = Math.sign(e9[i-1]- e15[i-1]);
+    if (now !== 0 && prev !== 0 && now !== prev){ crossIdx = i; crossDir = now; break; }
+  }
+  const barsSince = crossIdx === -1 ? Infinity : n - crossIdx;
+  const price = closes[n];
+  const A = a[n];
+  const slDist = 1.5 * A;
+  const tpDist = slDist * rr;
+
+  let verdict, why, dir = null;
+  const trend = e9[n] > e15[n] ? 'up' : 'down';
+
+  if (barsSince <= 3 && crossDir === 1){
+    verdict='BUY'; dir='buy';
+    why = `9 EMA crossed above 15 EMA ${barsSince} candle${barsSince===1?'':'s'} ago — fresh long signal`;
+  } else if (barsSince <= 3 && crossDir === -1){
+    verdict='SELL'; dir='sell';
+    why = `9 EMA crossed below 15 EMA ${barsSince} candle${barsSince===1?'':'s'} ago — fresh short signal`;
+  } else {
+    verdict='HOLD'; dir='hold';
+    why = trend==='up'
+      ? `Uptrend continuing — last crossover was ${barsSince} candles ago. No fresh entry; wait for the next cross.`
+      : `Downtrend continuing — last crossover was ${barsSince} candles ago. No fresh entry; wait for the next cross.`;
+  }
+
+  const long = dir === 'buy';
+  return {
+    verdict, dir, why, price, atr:A, barsSince, crossIdx, trend,
+    sl: dir==='hold' ? null : (long ? price - slDist : price + slDist),
+    tp: dir==='hold' ? null : (long ? price + tpDist : price - tpDist),
+    slDist, tpDist, e9, e15
+  };
+}
+
+/* ---------- data fetch ---------- */
+async function fetchCandles(sym, tf, key){
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf}&outputsize=120&apikey=${encodeURIComponent(key)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if (data.status === 'error' || !data.values) throw new Error(data.message || 'No data returned');
+  return data.values.map(v => ({
+    t: v.datetime, o:+v.open, h:+v.high, l:+v.low, c:+v.close
+  })).reverse();
+}
+
+/* ---------- chart ---------- */
+function renderChart(candles, sig, pair){
+  const view = candles.slice(-60);
+  const off = candles.length - view.length;
+  const W=360, H=190, padL=6, padR=44, padT=8, padB=10;
+  const hi = Math.max(...view.map(c=>c.h));
+  const lo = Math.min(...view.map(c=>c.l));
+  const y = v => padT + (hi - v) / (hi - lo || 1) * (H - padT - padB);
+  const x = i => padL + i * ((W - padL - padR) / view.length);
+  const cw = Math.max(2, (W - padL - padR)/view.length - 2);
+
+  let bars='';
+  view.forEach((c,i)=>{
+    const col = c.c >= c.o ? 'var(--buy)' : 'var(--sell)';
+    const bx = x(i)+cw/2;
+    bars += `<line x1="${bx}" y1="${y(c.h)}" x2="${bx}" y2="${y(c.l)}" stroke="${col}" stroke-width="1" opacity=".55"/>`;
+    bars += `<rect x="${x(i)}" y="${Math.min(y(c.o),y(c.c))}" width="${cw}" height="${Math.max(1,Math.abs(y(c.o)-y(c.c)))}" fill="${col}" opacity=".85"/>`;
+  });
+
+  const line = (arr, col) => {
+    let d='';
+    view.forEach((c,i)=>{
+      const v = arr[off+i];
+      if (v==null) return;
+      d += (d?'L':'M') + (x(i)+cw/2).toFixed(1) + ',' + y(v).toFixed(1);
+    });
+    return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`;
+  };
+
+  let cross='';
+  if (sig.crossIdx >= off){
+    const i = sig.crossIdx - off;
+    cross = `<circle cx="${x(i)+cw/2}" cy="${y(sig.e9[sig.crossIdx])}" r="5" fill="none" stroke="var(--text)" stroke-width="1.5"/>`;
+  }
+
+  const last = view[view.length-1].c;
+  const lbl = `<text x="${W-padR+4}" y="${y(last)+4}" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono">${last.toFixed(pair.dp)}</text>`;
+
+  return `
+  <div class="chartwrap">
+    <div class="cap">
+      <span>${selPair} · ${selTf} · last ${view.length} candles</span>
+      <span class="legend"><i style="background:#7FB4FF"></i>EMA 9 &nbsp;<i style="background:#C792EA"></i>EMA 15</span>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Price chart with EMAs">
+      ${bars}${line(sig.e9,'#7FB4FF')}${line(sig.e15,'#C792EA')}${cross}${lbl}
+    </svg>
+  </div>`;
+}
+
+/* ---------- signal page ---------- */
+function fmtDist(d, pair){
+  return (d / pair.pip).toFixed(1) + ' ' + pair.unit;
+}
+let lastSig = null;
+
+function renderSignal(sig, pair){
+  lastSig = { sig, pair: pair.sym, tf: selTf };
+  const f = v => v.toFixed(pair.dp);
+  let ladder = '';
+  if (sig.dir !== 'hold'){
+    const rows = sig.dir==='buy'
+      ? [['tp','Take profit',sig.tp,'+'+fmtDist(sig.tpDist,pair)],['entry','Entry',sig.price,''],['sl','Stop loss',sig.sl,'−'+fmtDist(sig.slDist,pair)]]
+      : [['tp','Take profit',sig.tp,'−'+fmtDist(sig.tpDist,pair)],['entry','Entry',sig.price,''],['sl','Stop loss',sig.sl,'+'+fmtDist(sig.slDist,pair)]];
+    ladder = `<div class="ladder">` + rows.map(r=>`
+      <div class="rung ${r[0]}">
+        <div class="lab">${r[1]}</div>
+        <div class="price mono">${f(r[2])}</div>
+        <div class="dist mono">${r[3]}</div>
+      </div>`).join('') + `</div>
+      <button class="primary logbtn" onclick="logTrade()">Log to journal</button>`;
+  } else {
+    ladder = `<div class="ladder">
+      <div class="rung entry"><div class="lab">Price</div><div class="price mono">${f(sig.price)}</div><div class="dist"></div></div>
+    </div>`;
+  }
+  document.getElementById('signalOut').innerHTML = `
+    <div class="verdict ${sig.dir}">
+      <div class="verdict-head">
+        <div class="verdict-tag ${sig.dir}">${sig.verdict}</div>
+        <div class="verdict-why">${sig.why}</div>
+      </div>
+      ${ladder}
+      <div class="meta">
+        <span class="pill mono">ATR(14) ${sig.atr.toFixed(pair.dp)}</span>
+        <span class="pill">SL 1.5×ATR</span>
+        <span class="pill">R:R 1:${getRR()}</span>
+        <span class="pill">Trend: ${sig.trend}</span>
+      </div>
+    </div>
+    ${renderChart(window.__candles, sig, pair)}`;
+}
+
+async function analyse(){
+  const key = store.get('apiKey');
+  const out = document.getElementById('signalOut');
+  if (!key){ out.innerHTML = `<div class="err">Add your Twelve Data API key on the Settings tab first.</div>`; return; }
+  const btn = document.getElementById('analyseBtn');
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Fetching…';
+  try{
+    const pair = PAIRS.find(p=>p.sym===selPair);
+    const candles = await fetchCandles(selPair, selTf, key);
+    window.__candles = candles;
+    const sig = buildSignal(candles, getRR());
+    renderSignal(sig, pair);
+  }catch(e){
+    out.innerHTML = `<div class="err">Couldn't fetch data: ${e.message}. Check your API key, connection, or rate limit (8 requests/min on the free tier).</div>`;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Analyse';
+  }
+}
+
+/* ---------- journal ---------- */
+function getTrades(){ try { return JSON.parse(store.get('trades')||'[]'); } catch(e){ return []; } }
+function setTrades(t){ store.set('trades', JSON.stringify(t)); }
+
+function logTrade(){
+  if (!lastSig || lastSig.sig.dir==='hold') return;
+  const s = lastSig.sig;
+  const t = getTrades();
+  t.unshift({
+    id: Date.now(), pair: lastSig.pair, tf: lastSig.tf, dir: s.dir,
+    entry: s.price, sl: s.sl, tp: s.tp, rr: getRR(),
+    when: new Date().toISOString(), outcome: null
+  });
+  setTrades(t);
+  document.querySelector('nav button[data-page="journal"]').click();
+}
+
+function setOutcome(id, o){
+  const t = getTrades();
+  const tr = t.find(x=>x.id===id);
+  if (tr) tr.outcome = o;
+  setTrades(t);
+  renderJournal();
+}
+
+function renderJournal(){
+  const t = getTrades();
+  const closed = t.filter(x=>x.outcome && x.outcome!=='skip');
+  const wins = closed.filter(x=>x.outcome==='win').length;
+  const losses = closed.filter(x=>x.outcome==='loss').length;
+  const netR = closed.reduce((s,x)=> s + (x.outcome==='win'? +x.rr : x.outcome==='loss'? -1 : 0), 0);
+  const wr = closed.length ? Math.round(wins/closed.length*100) : 0;
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><b>${closed.length}</b><span>closed</span></div>
+    <div class="stat"><b>${wr}%</b><span>win rate</span></div>
+    <div class="stat"><b style="color:${netR>=0?'var(--buy)':'var(--sell)'}">${netR>=0?'+':''}${netR.toFixed(1)}R</b><span>net result</span></div>`;
+
+  const sd = store.get('startDate');
+  let prog = 'Set your paper trading start date in Settings to track your 4–6 month window.';
+  if (sd){
+    const days = Math.floor((Date.now() - new Date(sd).getTime())/86400000);
+    const months = (days/30.44).toFixed(1);
+    prog = `Paper trading for <b>${days} days</b> (~${months} months) of your 4–6 month evaluation. ${wins+losses} decided trades so far.`;
+  }
+  document.getElementById('paperProgress').innerHTML = prog;
+
+  const list = document.getElementById('tradeList');
+  if (!t.length){ list.innerHTML = `<div class="empty">No trades logged yet.<br>Run an analysis and tap “Log to journal” on a fresh signal.</div>`; return; }
+  list.innerHTML = t.map(x=>{
+    const d = new Date(x.when);
+    const when = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    const dp = (PAIRS.find(p=>p.sym===x.pair)||{dp:5}).dp;
+    const badge = x.outcome==='win' ? `<span class="badge win">WIN +${x.rr}R</span>`
+                : x.outcome==='loss'? `<span class="badge loss">LOSS −1R</span>`
+                : x.outcome==='be'  ? `<span class="badge be">BREAK-EVEN</span>`
+                : x.outcome==='skip'? `<span class="badge be">SKIPPED</span>` : '';
+    const btns = x.outcome ? '' : `
+      <div class="outcomes">
+        <button class="w" onclick="setOutcome(${x.id},'win')">Won</button>
+        <button class="l" onclick="setOutcome(${x.id},'loss')">Lost</button>
+        <button onclick="setOutcome(${x.id},'be')">B/E</button>
+        <button onclick="setOutcome(${x.id},'skip')">Skip</button>
+      </div>`;
+    return `<div class="trade">
+      <div class="top">
+        <span class="dir ${x.dir}">${x.dir.toUpperCase()} ${x.pair}</span>
+        ${badge || `<span class="when">${when} · ${x.tf}</span>`}
+      </div>
+      <div class="lvls mono">E ${x.entry.toFixed(dp)} · SL ${x.sl.toFixed(dp)} · TP ${x.tp.toFixed(dp)}</div>
+      ${btns}
+    </div>`;
+  }).join('');
+}
+
+/* ---------- settings ---------- */
+function getRR(){ return parseFloat(store.get('rr') || '1.5'); }
+function initSettings(){
+  document.getElementById('apiKey').value = store.get('apiKey') || '';
+  document.getElementById('rrSelect').value = String(getRR());
+  document.getElementById('startDate').value = store.get('startDate') || '';
+  document.getElementById('saveSettings').onclick = () => {
+    store.set('apiKey', document.getElementById('apiKey').value.trim());
+    store.set('rr', document.getElementById('rrSelect').value);
+    store.set('startDate', document.getElementById('startDate').value.trim());
+    const b = document.getElementById('saveSettings');
+    b.textContent = 'Saved ✓'; setTimeout(()=>b.textContent='Save settings', 1200);
+  };
+}
+
+/* ---------- shell ---------- */
+function renderChips(){
+  document.getElementById('pairChips').innerHTML = PAIRS.map(p=>
+    `<button class="chip ${p.sym===selPair?'on':''}" onclick="selPair='${p.sym}';store.set('pair',selPair);renderChips()">${p.sym}</button>`).join('');
+  document.getElementById('tfChips').innerHTML = TFS.map(t=>
+    `<button class="chip tf ${t===selTf?'on':''}" onclick="selTf='${t}';store.set('tf',selTf);renderChips()">${t}</button>`).join('');
+}
+document.querySelectorAll('nav button').forEach(b=>{
+  b.onclick = () => {
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    b.classList.add('on');
+    document.getElementById('page-'+b.dataset.page).classList.add('active');
+    if (b.dataset.page==='journal') renderJournal();
+  };
+});
+document.getElementById('analyseBtn').onclick = analyse;
+renderChips(); initSettings(); renderJournal();
+</script>
+</body>
+</html>
