@@ -72,6 +72,7 @@ button.ghost{
   padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:none;
   color:var(--muted);font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer
 }
+button.ghost.back{display:block;width:100%;margin-top:14px;padding:12px;color:var(--text)}
 
 /* ---- verdict card + price ladder (signature) ---- */
 .verdict{border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);overflow:hidden;margin-top:14px}
@@ -182,7 +183,7 @@ nav button.on .dot{background:var(--buy)}
 <div class="page" id="page-settings">
   <label>Twelve Data API key</label>
   <input type="text" id="apiKey" placeholder="Paste your free API key" autocomplete="off">
-  <p class="note">Get a free key at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com</a> — the free tier covers all five pairs, 8 requests/minute.</p>
+  <p class="note">Get a free key at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com</a> — the free tier covers all the pairs in this app, 8 requests/minute.</p>
 
   <label>Risk : reward</label>
   <select id="rrSelect">
@@ -579,13 +580,23 @@ async function scanAll(){
   btn.disabled = false; btn.textContent = 'Scan focus pairs';
 }
 
+let lastScanHTML = null;
+
 function openScan(sym){
   const hit = scanCache[sym];
   if (!hit) return;
+  const out = document.getElementById('signalOut');
+  lastScanHTML = out.innerHTML;
   selPair = sym; store.set('pair', sym); renderChips();
   window.__candles = hit.candles;
   renderSignal(hit.sig, PAIRS.find(p=>p.sym===sym));
+  out.insertAdjacentHTML('afterbegin',
+    `<button class="ghost back" onclick="backToScan()">&#8592; Back to scan results</button>`);
   window.scrollTo({top:0});
+}
+
+function backToScan(){
+  if (lastScanHTML) document.getElementById('signalOut').innerHTML = lastScanHTML;
 }
 document.getElementById('scanBtn').onclick = scanAll;
 renderChips(); initSettings(); renderJournal();
