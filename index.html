@@ -218,6 +218,11 @@ nav button.on .dot{background:var(--buy)}
   <p class="note">Used to track your 4–6 month evaluation window on the Journal tab.</p>
 
   <button class="primary" id="saveSettings">Save settings</button>
+
+  <label>Fresh start</label>
+  <button class="primary alt" id="resetJournal">Reset journal &amp; start date</button>
+  <p class="note">Clears all logged trades and sets your paper trading start date to today. Use once at the true start of your evaluation — a journal only means something if it survives bad days.</p>
+
   <div class="warn">Signals are generated mechanically from the 9/15 EMA crossover and are not financial advice. This tool is for paper trading and strategy evaluation only.</div>
 </div>
 
@@ -660,6 +665,24 @@ function initSettings(){
     store.set('startDate', document.getElementById('startDate').value.trim());
     const b = document.getElementById('saveSettings');
     b.textContent = 'Saved ✓'; setTimeout(()=>b.textContent='Save settings', 1200);
+  };
+
+  let resetArmed = false;
+  document.getElementById('resetJournal').onclick = () => {
+    const b = document.getElementById('resetJournal');
+    if (!resetArmed){
+      resetArmed = true;
+      b.textContent = 'Tap again to confirm — this wipes all trades';
+      setTimeout(()=>{ resetArmed=false; b.innerHTML='Reset journal &amp; start date'; }, 4000);
+      return;
+    }
+    setTrades([]);
+    const today = todayISO();
+    store.set('startDate', today);
+    document.getElementById('startDate').value = today;
+    resetArmed = false;
+    b.textContent = 'Journal reset ✓';
+    setTimeout(()=>b.innerHTML='Reset journal &amp; start date', 1500);
   };
 }
 
