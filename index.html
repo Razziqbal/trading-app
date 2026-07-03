@@ -154,6 +154,26 @@ nav button.on .dot{background:var(--buy)}
 .spin{display:inline-block;width:14px;height:14px;border:2px solid var(--bg);border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation:none}}
+
+/* ---- guardrail banners ---- */
+.gbanner{border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12px;line-height:1.5}
+.gbanner.time{background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+.gbanner.holiday{background:var(--hold-dim);border:1px solid rgba(232,184,75,.35);color:var(--hold)}
+.gbanner b{color:var(--text)}
+.gbanner .glink{background:none;border:none;color:var(--text);text-decoration:underline;font-weight:700;font-size:12px;padding:0;margin-left:4px;cursor:pointer;font-family:'Archivo'}
+
+/* ---- pre-log checklist ---- */
+.checklist{margin:0 16px 16px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.checklist .crow{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);padding:6px 0;border-bottom:1px dashed var(--line)}
+.checklist .crow:last-of-type{border-bottom:none}
+.checklist .crow .ok{color:var(--buy);font-weight:800}
+.checklist .crow .bad{color:var(--sell);font-weight:800}
+.checklist input[type=text]{margin-top:8px;font-size:16px;padding:11px}
+.checklist .clab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-top:10px;display:block}
+.checklist .cbtns{display:flex;gap:8px;margin-top:12px}
+.checklist .cbtns button{flex:1;margin-top:0}
+.checklist .slipwarn{color:var(--sell);font-size:12px;margin-top:6px}
+.checklist .sliptok{color:var(--buy);font-size:12px;margin-top:6px}
 </style>
 </head>
 <body>
@@ -165,6 +185,7 @@ nav button.on .dot{background:var(--buy)}
 
 <!-- ================= SIGNAL ================= -->
 <div class="page active" id="page-signal">
+  <div id="guardBanners"></div>
   <div class="chips" id="pairChips"></div>
   <div class="chips" id="tfChips" style="margin-top:8px"></div>
   <button class="primary" id="analyseBtn">Analyse</button>
@@ -231,6 +252,69 @@ const FOCUS = ['GBP/JPY','XAU/USD','USD/JPY','EUR/USD'];
 const TFS = ['5min','15min','1h'];
 let selPair = store.get('pair') || 'EUR/USD';
 let selTf   = store.get('tf')   || '15min';
+
+/* ---------- discipline guardrails ---------- */
+/* UK/US market holidays that thin out liquidity. Update yearly. */
+const HOLIDAYS = [
+  { date:'2026-01-01', label:"New Year's Day" },
+  { date:'2026-01-19', label:'US Martin Luther King Jr. Day' },
+  { date:'2026-02-16', label:'US Presidents Day' },
+  { date:'2026-04-03', label:'Good Friday' },
+  { date:'2026-04-06', label:'UK Easter Monday' },
+  { date:'2026-05-04', label:'UK Early May bank holiday' },
+  { date:'2026-05-25', label:'UK Spring bank holiday / US Memorial Day' },
+  { date:'2026-06-19', label:'US Juneteenth' },
+  { date:'2026-07-03', label:'US Independence Day (observed)' },
+  { date:'2026-08-31', label:'UK Summer bank holiday' },
+  { date:'2026-09-07', label:'US Labor Day' },
+  { date:'2026-11-26', label:'US Thanksgiving' },
+  { date:'2026-11-27', label:'US Thanksgiving (half day)' },
+  { date:'2026-12-25', label:'Christmas Day' },
+  { date:'2026-12-28', label:'Boxing Day (observed)' }
+];
+const TRADE_WINDOW = { startH:8, startM:30, endH:17, endM:0 };
+let windowOverride = false;
+
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function checkHoliday(){
+  const iso = todayISO();
+  return HOLIDAYS.find(h => h.date === iso) || null;
+}
+function inTradingWindow(){
+  const d = new Date();
+  const mins = d.getHours()*60 + d.getMinutes();
+  const start = TRADE_WINDOW.startH*60 + TRADE_WINDOW.startM;
+  const end = TRADE_WINDOW.endH*60 + TRADE_WINDOW.endM;
+  return mins >= start && mins <= end;
+}
+function renderGuard(){
+  const box = document.getElementById('guardBanners');
+  if (!box) return;
+  let html = '';
+  const hol = checkHoliday();
+  if (hol){
+    html += `<div class="gbanner holiday">⚠ <b>${hol.label}</b> today — expect thin, choppy conditions. Consider standing aside per your rules.</div>`;
+  }
+  const inWindow = inTradingWindow();
+  if (!inWindow && !windowOverride){
+    html += `<div class="gbanner time">⏳ Outside your 8:30am–5pm trading window — signals may reflect thin trading.<button class="glink" onclick="overrideWindow()">Check anyway</button></div>`;
+  } else if (!inWindow && windowOverride){
+    html += `<div class="gbanner time">⏳ Outside trading window — override active for this session.</div>`;
+  }
+  box.innerHTML = html;
+  const disable = !inWindow && !windowOverride;
+  const aBtn = document.getElementById('analyseBtn');
+  const sBtn = document.getElementById('scanBtn');
+  if (aBtn) aBtn.disabled = disable;
+  if (sBtn) sBtn.disabled = disable;
+}
+function overrideWindow(){
+  windowOverride = true;
+  renderGuard();
+}
 
 /* ---------- indicators ---------- */
 function ema(vals, p){
@@ -307,7 +391,7 @@ function buildSignal(candles, rr){
 
 /* ---------- data fetch ---------- */
 async function fetchCandles(sym, tf, key){
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf}&outputsize=120&apikey=${encodeURIComponent(key)}`;
+  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf}&outputsize=120&timezone=UTC&apikey=${encodeURIComponent(key)}`;
   const res = await fetch(url);
   const data = await res.json();
   if (data.status === 'error' || !data.values) throw new Error(data.message || 'No data returned');
@@ -373,7 +457,7 @@ function fmtDist(d, pair){
 let lastSig = null;
 
 function renderSignal(sig, pair){
-  lastSig = { sig, pair: pair.sym, tf: selTf };
+  lastSig = { sig, pairObj: pair, pair: pair.sym, tf: selTf };
   const f = v => v.toFixed(pair.dp);
   let ladder = '';
   if (sig.dir !== 'hold'){
@@ -386,7 +470,8 @@ function renderSignal(sig, pair){
         <div class="price mono">${f(r[2])}</div>
         <div class="dist mono">${r[3]}</div>
       </div>`).join('') + `</div>
-      <button class="primary logbtn" onclick="logTrade()">Log to journal</button>`;
+      <button class="primary logbtn" id="logTriggerBtn" onclick="openLogChecklist()">Log to journal</button>
+      <div id="logChecklist"></div>`;
   } else {
     ladder = `<div class="ladder">
       <div class="rung entry"><div class="lab">Price</div><div class="price mono">${f(sig.price)}</div><div class="dist"></div></div>
@@ -424,7 +509,8 @@ async function analyse(){
   }catch(e){
     out.innerHTML = `<div class="err">Couldn't fetch data: ${e.message}. Check your API key, connection, or rate limit (8 requests/min on the free tier).</div>`;
   }finally{
-    btn.disabled = false; btn.textContent = 'Analyse';
+    btn.textContent = 'Analyse';
+    renderGuard();
   }
 }
 
@@ -432,13 +518,72 @@ async function analyse(){
 function getTrades(){ try { return JSON.parse(store.get('trades')||'[]'); } catch(e){ return []; } }
 function setTrades(t){ store.set('trades', JSON.stringify(t)); }
 
-function logTrade(){
+function openLogChecklist(){
+  if (!lastSig || lastSig.sig.dir==='hold') return;
+  const s = lastSig.sig, pair = lastSig.pairObj;
+  const candles = window.__candles;
+  const last = candles[candles.length-1];
+  const tfMinutes = {'5min':5,'15min':15,'1h':60}[lastSig.tf] || 15;
+  const start = new Date(last.t.replace(' ','T')+'Z');
+  const end = new Date(start.getTime() + tfMinutes*60000);
+  const now = new Date();
+  const closed = now >= end;
+  const minsLeft = Math.ceil((end-now)/60000);
+  const minsAgo = Math.floor((now-end)/60000);
+
+  const candleRow = closed
+    ? `<div class="crow"><span class="ok">✓</span>&nbsp;Signal candle closed ${minsAgo<1?'just now':minsAgo+' min ago'}</div>`
+    : `<div class="crow"><span class="bad">⚠</span>&nbsp;Signal candle still forming — ${minsLeft} min left. Re-analyse once it closes before logging.</div>`;
+
+  document.getElementById('logTriggerBtn').style.display = 'none';
+  document.getElementById('logChecklist').innerHTML = `
+    <div class="checklist" id="checklistBody">
+      ${candleRow}
+      <span class="clab">Your actual fill price</span>
+      <input type="text" inputmode="decimal" id="fillPrice" value="${s.price.toFixed(pair.dp)}" oninput="updateSlipCheck()">
+      <div id="slipStatus"></div>
+      <div class="cbtns">
+        <button class="ghost" style="flex:1" onclick="cancelLogChecklist()">Cancel</button>
+        <button class="primary" id="confirmLogBtn" style="margin-top:0" ${closed?'':'disabled'} onclick="confirmLog()">Confirm & log</button>
+      </div>
+    </div>`;
+  updateSlipCheck();
+}
+
+function updateSlipCheck(){
+  if (!lastSig) return;
+  const s = lastSig.sig, pair = lastSig.pairObj;
+  const input = document.getElementById('fillPrice');
+  const el = document.getElementById('slipStatus');
+  if (!input || !el) return;
+  const fill = parseFloat(input.value);
+  if (isNaN(fill)){ el.innerHTML=''; return; }
+  const gap = Math.abs(fill - s.price);
+  const tolerance = 0.3 * s.atr; /* ~20% of the 1.5×ATR stop distance */
+  const gapDisp = (gap/pair.pip).toFixed(1)+' '+pair.unit;
+  if (gap <= tolerance){
+    el.innerHTML = `<div class="sliptok">✓ ${gapDisp} from printed entry — within tolerance</div>`;
+  } else {
+    el.innerHTML = `<div class="slipwarn">⚠ ${gapDisp} from printed entry — beyond your ~⅓ ATR tolerance. Consider skipping this one.</div>`;
+  }
+}
+
+function cancelLogChecklist(){
+  const cl = document.getElementById('logChecklist');
+  if (cl) cl.innerHTML = '';
+  const btn = document.getElementById('logTriggerBtn');
+  if (btn) btn.style.display = '';
+}
+
+function confirmLog(){
   if (!lastSig || lastSig.sig.dir==='hold') return;
   const s = lastSig.sig;
+  const input = document.getElementById('fillPrice');
+  const fill = input && !isNaN(parseFloat(input.value)) ? parseFloat(input.value) : s.price;
   const t = getTrades();
   t.unshift({
     id: Date.now(), pair: lastSig.pair, tf: lastSig.tf, dir: s.dir,
-    entry: s.price, sl: s.sl, tp: s.tp, rr: getRR(),
+    entry: fill, sl: s.sl, tp: s.tp, rr: getRR(),
     when: new Date().toISOString(), outcome: null
   });
   setTrades(t);
@@ -532,6 +677,7 @@ document.querySelectorAll('nav button').forEach(b=>{
     b.classList.add('on');
     document.getElementById('page-'+b.dataset.page).classList.add('active');
     if (b.dataset.page==='journal') renderJournal();
+    if (b.dataset.page==='signal') renderGuard();
   };
 });
 document.getElementById('analyseBtn').onclick = analyse;
@@ -577,7 +723,8 @@ async function scanAll(){
     if (i < FOCUS.length-1) await sleep(400);
   }
   board.insertAdjacentHTML('beforeend', `<div class="scanhint">Tap a pair for the chart, levels and journal logging.</div>`);
-  btn.disabled = false; btn.textContent = 'Scan focus pairs';
+  btn.textContent = 'Scan focus pairs';
+  renderGuard();
 }
 
 let lastScanHTML = null;
@@ -599,7 +746,8 @@ function backToScan(){
   if (lastScanHTML) document.getElementById('signalOut').innerHTML = lastScanHTML;
 }
 document.getElementById('scanBtn').onclick = scanAll;
-renderChips(); initSettings(); renderJournal();
+renderChips(); initSettings(); renderJournal(); renderGuard();
+setInterval(renderGuard, 60000);
 </script>
 </body>
 </html>
