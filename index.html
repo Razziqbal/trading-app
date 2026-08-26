@@ -1,776 +1,621 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Crossover — 9/15 EMA Signals</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>9/15 EMA Trading Tool</title>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-:root{
-  --bg:#0E1116; --surface:#171C23; --surface2:#1D242E; --line:#242D38;
-  --text:#E8EDF2; --muted:#8A96A3; --faint:#5A6675;
-  --buy:#2DD4A7; --sell:#FF6B5E; --hold:#E8B84B;
-  --buy-dim:rgba(45,212,167,.12); --sell-dim:rgba(255,107,94,.12); --hold-dim:rgba(232,184,75,.12);
-  --radius:14px;
-}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%}
-body{
-  background:var(--bg); color:var(--text);
-  font-family:'Archivo',system-ui,-apple-system,sans-serif;
-  font-size:15px; line-height:1.45;
-  padding-bottom:calc(64px + env(safe-area-inset-bottom));
-}
-.mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
-
-header{padding:18px 16px 10px;display:flex;align-items:baseline;justify-content:space-between}
-header h1{font-size:17px;font-weight:800;letter-spacing:.02em}
-header h1 span{color:var(--buy)}
-.sub{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.12em}
-
-.page{display:none;padding:0 16px 24px}
-.page.active{display:block}
-
-/* ---- controls ---- */
-.row{display:flex;gap:8px;margin-bottom:10px}
-.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{
-  flex:0 0 auto;padding:10px 14px;border-radius:999px;border:1px solid var(--line);
-  background:var(--surface);color:var(--muted);font-family:'IBM Plex Mono',monospace;
-  font-size:13px;font-weight:500;cursor:pointer
-}
-.chip.on{background:var(--text);color:var(--bg);border-color:var(--text);font-weight:600}
-.chip.tf{padding:8px 12px;font-size:12px}
-button.primary{
-  width:100%;padding:15px;border:none;border-radius:var(--radius);
-  background:var(--text);color:var(--bg);font-family:'Archivo';font-weight:800;
-  font-size:15px;letter-spacing:.02em;cursor:pointer;margin-top:6px
-}
-button.primary:disabled{opacity:.45}
-button.primary.alt{background:var(--surface2);color:var(--text);border:1px solid var(--line);margin-top:8px}
-
-/* ---- scan board ---- */
-.scanboard{margin-top:14px}
-.scanrow{
-  display:grid;grid-template-columns:86px 1fr auto;align-items:center;gap:10px;
-  background:var(--surface);border:1px solid var(--line);border-radius:12px;
-  padding:13px 14px;margin-bottom:8px;cursor:pointer
-}
-.scanrow .sym{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600}
-.scanrow .info{font-size:11px;color:var(--muted)}
-.scanrow .tag{font-weight:800;font-size:13px;letter-spacing:.03em;padding:5px 12px;border-radius:999px}
-.scanrow .tag.buy{background:var(--buy-dim);color:var(--buy)}
-.scanrow .tag.sell{background:var(--sell-dim);color:var(--sell)}
-.scanrow .tag.hold{background:var(--hold-dim);color:var(--hold)}
-.scanrow.err-row .tag{background:none;color:var(--faint);border:1px solid var(--line)}
-.scanhint{font-size:11px;color:var(--faint);text-align:center;margin:4px 0 2px}
-button.ghost{
-  padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:none;
-  color:var(--muted);font-family:'Archivo';font-weight:700;font-size:13px;cursor:pointer
-}
-button.ghost.back{display:block;width:100%;margin-top:14px;padding:12px;color:var(--text)}
-
-/* ---- verdict card + price ladder (signature) ---- */
-.verdict{border-radius:var(--radius);border:1px solid var(--line);background:var(--surface);overflow:hidden;margin-top:14px}
-.verdict-head{padding:16px;display:flex;justify-content:space-between;align-items:center}
-.verdict-tag{font-size:26px;font-weight:800;letter-spacing:.01em}
-.verdict-tag.buy{color:var(--buy)} .verdict-tag.sell{color:var(--sell)} .verdict-tag.hold{color:var(--hold)}
-.verdict-why{font-size:12px;color:var(--muted);max-width:52%;text-align:right}
-.verdict.buy .verdict-head{background:var(--buy-dim)}
-.verdict.sell .verdict-head{background:var(--sell-dim)}
-.verdict.hold .verdict-head{background:var(--hold-dim)}
-
-.ladder{padding:6px 16px 14px}
-.rung{display:grid;grid-template-columns:74px 1fr auto;align-items:center;padding:11px 0;border-bottom:1px dashed var(--line)}
-.rung:last-child{border-bottom:none}
-.rung .lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700}
-.rung .price{font-size:19px;font-weight:600}
-.rung .dist{font-size:11px;color:var(--muted);text-align:right}
-.rung.tp .price{color:var(--buy)} .rung.sl .price{color:var(--sell)}
-.rung.entry .price{color:var(--text);font-size:22px}
-
-.meta{display:flex;gap:8px;padding:0 16px 16px;flex-wrap:wrap}
-.pill{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 10px}
-.logbtn{margin:0 16px 16px;width:calc(100% - 32px)}
-
-/* ---- chart ---- */
-.chartwrap{margin-top:14px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);padding:12px 8px 6px}
-.chartwrap .cap{display:flex;justify-content:space-between;padding:0 8px 6px;font-size:11px;color:var(--faint)}
-.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:4px}
-svg{display:block;width:100%}
-
-/* ---- journal ---- */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center}
-.stat b{display:block;font-size:20px;font-weight:600;font-family:'IBM Plex Mono',monospace}
-.stat span{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.1em}
-.trade{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
-.trade .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.trade .dir{font-weight:800;font-size:14px}
-.trade .dir.buy{color:var(--buy)} .trade .dir.sell{color:var(--sell)}
-.trade .when{font-size:11px;color:var(--faint)}
-.trade .lvls{font-size:12px;color:var(--muted);margin-bottom:8px}
-.outcomes{display:flex;gap:6px}
-.outcomes button{flex:1;padding:9px 0;border-radius:9px;border:1px solid var(--line);background:none;color:var(--muted);font-size:12px;font-weight:700;font-family:'Archivo';cursor:pointer}
-.outcomes .w{color:var(--buy);border-color:rgba(45,212,167,.4)}
-.outcomes .l{color:var(--sell);border-color:rgba(255,107,94,.4)}
-.badge{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
-.badge.win{background:var(--buy-dim);color:var(--buy)}
-.badge.loss{background:var(--sell-dim);color:var(--sell)}
-.badge.be{background:var(--hold-dim);color:var(--hold)}
-.empty{color:var(--faint);text-align:center;padding:36px 12px;font-size:13px}
-.paper{font-size:12px;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:14px}
-.paper b{color:var(--text)}
-
-/* ---- settings ---- */
-label{display:block;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);font-weight:700;margin:16px 0 6px}
-input[type=text],select{
-  width:100%;padding:13px;border-radius:12px;border:1px solid var(--line);
-  background:var(--surface);color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:14px
-}
-.note{font-size:12px;color:var(--muted);margin-top:8px}
-.note a{color:var(--buy)}
-.warn{margin-top:18px;font-size:12px;color:var(--faint);border-top:1px solid var(--line);padding-top:14px}
-
-/* ---- tab bar ---- */
-nav{
-  position:fixed;bottom:0;left:0;right:0;display:flex;
-  background:rgba(14,17,22,.92);backdrop-filter:blur(12px);
-  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)
-}
-nav button{
-  flex:1;padding:12px 0 10px;background:none;border:none;color:var(--faint);
-  font-family:'Archivo';font-size:11px;font-weight:700;letter-spacing:.06em;cursor:pointer
-}
-nav button.on{color:var(--text)}
-nav button .dot{display:block;width:4px;height:4px;border-radius:50%;background:transparent;margin:4px auto 0}
-nav button.on .dot{background:var(--buy)}
-
-.err{margin-top:14px;background:var(--sell-dim);border:1px solid rgba(255,107,94,.35);color:#FFB1A8;border-radius:12px;padding:12px;font-size:13px}
-.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--bg);border-top-color:transparent;border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
-@keyframes sp{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.spin{animation:none}}
-
-/* ---- guardrail banners ---- */
-.gbanner{border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:12px;line-height:1.5}
-.gbanner.time{background:var(--surface);border:1px solid var(--line);color:var(--muted)}
-.gbanner.holiday{background:var(--hold-dim);border:1px solid rgba(232,184,75,.35);color:var(--hold)}
-.gbanner b{color:var(--text)}
-.gbanner .glink{background:none;border:none;color:var(--text);text-decoration:underline;font-weight:700;font-size:12px;padding:0;margin-left:4px;cursor:pointer;font-family:'Archivo'}
-
-/* ---- pre-log checklist ---- */
-.checklist{margin:0 16px 16px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:14px}
-.checklist .crow{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:var(--muted);padding:6px 0;border-bottom:1px dashed var(--line)}
-.checklist .crow:last-of-type{border-bottom:none}
-.checklist .crow .ok{color:var(--buy);font-weight:800}
-.checklist .crow .bad{color:var(--sell);font-weight:800}
-.checklist input[type=text]{margin-top:8px;font-size:16px;padding:11px}
-.checklist .clab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-top:10px;display:block}
-.checklist .cbtns{display:flex;gap:8px;margin-top:12px}
-.checklist .cbtns button{flex:1;margin-top:0}
-.checklist .slipwarn{color:var(--sell);font-size:12px;margin-top:6px}
-.checklist .sliptok{color:var(--buy);font-size:12px;margin-top:6px}
+  * { box-sizing: border-box; }
+  body { margin:0; background:#060B18; }
+  input:focus { border-color:#3B82F6 !important; }
+  ::-webkit-scrollbar { width:8px; height:8px; }
+  ::-webkit-scrollbar-track { background:#0A1020; }
+  ::-webkit-scrollbar-thumb { background:#1E293B; border-radius:4px; }
 </style>
 </head>
 <body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
 
-<header>
-  <h1>CROSSOVER<span>.</span></h1>
-  <div class="sub">9/15 EMA · paper trading</div>
-</header>
+// ─── MATHS ───────────────────────────────────────────────────────────────────
+function calcEMA(prices, period) {
+  if (prices.length < period) return prices.map(() => null);
+  const k = 2 / (period + 1);
+  const out = new Array(period - 1).fill(null);
+  out.push(prices.slice(0, period).reduce((a, b) => a + b, 0) / period);
+  for (let i = period; i < prices.length; i++)
+    out.push(prices[i] * k + out[out.length - 1] * (1 - k));
+  return out;
+}
+function calcATR(hi, lo, cl, p = 14) {
+  const tr = [hi[0] - lo[0]];
+  for (let i = 1; i < cl.length; i++)
+    tr.push(Math.max(hi[i]-lo[i], Math.abs(hi[i]-cl[i-1]), Math.abs(lo[i]-cl[i-1])));
+  const out = new Array(p - 1).fill(null);
+  let atr = tr.slice(0, p).reduce((a,b)=>a+b,0)/p;
+  out.push(atr);
+  for (let i = p; i < tr.length; i++) { atr=(atr*(p-1)+tr[i])/p; out.push(atr); }
+  return out;
+}
+function runBacktest(data, e9, e15, atrs, cap=10000) {
+  const trades=[]; let capital=cap, peak=cap, maxDD=0, pos=null;
+  for (let i=1; i<data.length; i++) {
+    if (e9[i]==null||e15[i]==null||atrs[i]==null) continue;
+    const price=data[i].close;
+    const crossUp  = e9[i]>e15[i]  && e9[i-1]!=null && e9[i-1]<=(e15[i-1]??e9[i-1]);
+    const crossDown = e9[i]<e15[i] && e9[i-1]!=null && e9[i-1]>=(e15[i-1]??e9[i-1]);
+    if (pos) {
+      const hitSL=data[i].low<=pos.sl, hitTP=data[i].high>=pos.tp;
+      if (hitSL||hitTP||crossDown) {
+        const ep=hitSL?pos.sl:hitTP?pos.tp:price;
+        const pnl=(ep-pos.entry)*pos.units;
+        capital+=pnl; if(capital>peak) peak=capital;
+        const dd=((peak-capital)/peak)*100; if(dd>maxDD) maxDD=dd;
+        trades.push({id:trades.length+1,entryDate:pos.entryDate,exitDate:data[i].date,
+          entry:pos.entry,exit:ep,sl:pos.sl,tp:pos.tp,pnl:+pnl.toFixed(2),
+          pnlPct:+((ep-pos.entry)/pos.entry*100).toFixed(3),
+          result:pnl>=0?"WIN":"LOSS",reason:hitSL?"Stop Loss":hitTP?"Take Profit":"Signal Exit"});
+        pos=null;
+      }
+    }
+    if (!pos&&crossUp&&capital>0) {
+      const sl=+(price-atrs[i]*1.5).toFixed(5), tp=+(price+atrs[i]*3).toFixed(5);
+      const units=+(capital*0.95/price).toFixed(4);
+      if(units>0) pos={entryDate:data[i].date,entry:price,units,sl,tp};
+    }
+  }
+  return {trades,finalCapital:+capital.toFixed(2),maxDrawdown:+maxDD.toFixed(2)};
+}
 
-<!-- ================= SIGNAL ================= -->
-<div class="page active" id="page-signal">
-  <div id="guardBanners"></div>
-  <div class="chips" id="pairChips"></div>
-  <div class="chips" id="tfChips" style="margin-top:8px"></div>
-  <button class="primary" id="analyseBtn">Analyse</button>
-  <button class="primary alt" id="scanBtn">Scan focus pairs</button>
-  <div id="signalOut"></div>
-</div>
+// ─── PAIR UTILS ──────────────────────────────────────────────────────────────
+const FX_CCY = ["AUD","CAD","CHF","CNY","CZK","DKK","EUR","GBP","HKD","HUF","IDR","ILS","INR","JPY","KRW","MXN","MYR","NOK","NZD","PHP","PLN","RON","SEK","SGD","THB","TRY","TWD","USD","ZAR","XAU","XAG","XPT","XPD"];
+function isForexPair(sym) {
+  const s = sym.toUpperCase().replace(/[^A-Z]/g,"");
+  if (s.length!==6) return false;
+  return FX_CCY.includes(s.slice(0,3)) && FX_CCY.includes(s.slice(3,6));
+}
+function displaySym(sym) {
+  const s=sym.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  return isForexPair(s) ? `${s.slice(0,3)}/${s.slice(3)}` : s;
+}
+function pairDecimals(sym) {
+  const s=sym.toUpperCase();
+  if (s.includes("JPY")) return 3;
+  if (s.includes("XAU")||s.includes("XAG")||s.includes("OIL")||s.includes("XTI")) return 2;
+  return 5;
+}
+const fmt = (n,d)=>n!=null?parseFloat(n).toFixed(d??4):"—";
+const fmtUSD = n=>n!=null?`$${parseFloat(n).toFixed(2)}`:"—";
+const fmtPct = n=>n!=null?`${n>0?"+":""}${parseFloat(n).toFixed(2)}%`:"—";
+const timeAgo = s=>s<60?`${s}s ago`:s<3600?`${Math.floor(s/60)}m ago`:`${Math.floor(s/3600)}h ago`;
 
-<!-- ================= JOURNAL ================= -->
-<div class="page" id="page-journal">
-  <div class="paper" id="paperProgress"></div>
-  <div class="stats" id="statsRow"></div>
-  <div id="tradeList"></div>
-</div>
+// ─── API ──────────────────────────────────────────────────────────────────────
+// Aggregate ascending hourly bars into 4-hour candles aligned to 0/4/8/12/16/20.
+// open = first bar's open, high = max, low = min, close = last bar's close.
+function aggregate4h(bars) {
+  const groups = new Map();
+  for (const b of bars) {
+    const m = b.date.match(/(\d{4}-\d{2}-\d{2})[ T](\d{2}):/);
+    let key, label;
+    if (m) {
+      const bucket = Math.floor(parseInt(m[2],10)/4)*4;
+      const hh = String(bucket).padStart(2,"0");
+      key = `${m[1]} ${hh}`;
+      label = `${m[1]} ${hh}:00:00`;
+    } else { key = b.date; label = b.date; }
+    if (!groups.has(key)) groups.set(key, {date:label, open:b.open, high:b.high, low:b.low, close:b.close});
+    else {
+      const g = groups.get(key);
+      g.high = Math.max(g.high, b.high);
+      g.low  = Math.min(g.low,  b.low);
+      g.close = b.close;
+    }
+  }
+  return Array.from(groups.values());
+}
 
-<!-- ================= SETTINGS ================= -->
-<div class="page" id="page-settings">
-  <label>Twelve Data API key</label>
-  <input type="text" id="apiKey" placeholder="Paste your free API key" autocomplete="off">
-  <p class="note">Get a free key at <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com</a> — the free tier covers all the pairs in this app, 8 requests/minute.</p>
+async function fetchPriceData(sym, ivl, apiKey) {
+  const s = sym.toUpperCase().replace(/[^A-Z0-9]/g,"");
+  const isFx = isForexPair(s);
+  const apiIvl = ivl==="4h" ? "60min" : ivl;   // 4h is built by aggregating hourly bars
+  const isDaily = apiIvl==="daily";
+  let url, hint;
+  if (isFx) {
+    const from=s.slice(0,3), to=s.slice(3,6);
+    url = isDaily
+      ? `https://www.alphavantage.co/query?function=FX_DAILY&from_symbol=${from}&to_symbol=${to}&outputsize=full&apikey=${apiKey}`
+      : `https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=${from}&to_symbol=${to}&interval=${apiIvl}&outputsize=full&apikey=${apiKey}`;
+    hint = isDaily ? "Time Series FX (Daily)" : `Time Series FX (${apiIvl})`;
+  } else {
+    url = isDaily
+      ? `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${s}&outputsize=full&apikey=${apiKey}`
+      : `https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol=${s}&interval=${apiIvl}&outputsize=full&apikey=${apiKey}`;
+    hint = isDaily ? "Time Series (Daily)" : `Time Series (${apiIvl})`;
+  }
 
-  <label>Risk : reward</label>
-  <select id="rrSelect">
-    <option value="1.5">1 : 1.5</option>
-    <option value="2">1 : 2</option>
-  </select>
-  <p class="note">Stop loss is 1.5 × ATR(14) from entry. Take profit is the stop distance × your R:R.</p>
+  let resp;
+  try { resp = await fetch(url); }
+  catch(e) { throw new Error("Network request failed. If you opened this file directly, try serving it locally instead (see instructions). ("+e.message+")"); }
+  if (!resp.ok) throw new Error(`Server returned ${resp.status}. Try again shortly.`);
 
-  <label>Paper trading start date</label>
-  <input type="text" id="startDate" placeholder="YYYY-MM-DD">
-  <p class="note">Used to track your 4–6 month evaluation window on the Journal tab.</p>
+  let json;
+  try { json = await resp.json(); }
+  catch(e) { throw new Error("Invalid response from Alpha Vantage."); }
 
-  <button class="primary" id="saveSettings">Save settings</button>
+  if (json["Error Message"]) throw new Error(`Invalid symbol "${s}". Check the pair (e.g. EURUSD, XAUUSD).`);
+  if (json["Note"]) throw new Error("Rate limit reached — free tier is 25 calls/day, 5/min. Wait a minute.");
+  if (json["Information"]) throw new Error("Rate limit / key issue: "+json["Information"]);
 
-  <label>Fresh start</label>
-  <button class="primary alt" id="resetJournal">Reset journal &amp; start date</button>
-  <p class="note">Clears all logged trades and sets your paper trading start date to today. Use once at the true start of your evaluation — a journal only means something if it survives bad days.</p>
+  const tsKey = Object.keys(json).find(k => k.toLowerCase().includes("time series"));
+  if (!tsKey) throw new Error(`No price data. Response keys: [${Object.keys(json).join(", ")}]. Expected "${hint}".`);
 
-  <div class="warn">Signals are generated mechanically from the 9/15 EMA crossover and are not financial advice. This tool is for paper trading and strategy evaluation only.</div>
-</div>
+  const entries = Object.entries(json[tsKey]).sort(([a],[b])=>new Date(a)-new Date(b));
+  if (entries.length < 20) throw new Error(`Only ${entries.length} candles returned. Try Daily interval first.`);
 
-<nav>
-  <button class="on" data-page="signal">SIGNAL<span class="dot"></span></button>
-  <button data-page="journal">JOURNAL<span class="dot"></span></button>
-  <button data-page="settings">SETTINGS<span class="dot"></span></button>
-</nav>
+  let mapped = entries.map(([date,v])=>({
+    date, open:+v["1. open"], high:+v["2. high"], low:+v["3. low"], close:+v["4. close"],
+  }));
+  if (ivl==="4h") mapped = aggregate4h(mapped);
 
-<script>
-/* ---------- safe storage (works hosted; degrades in sandboxes) ---------- */
-const mem = {};
-const store = {
-  get(k){ try { return localStorage.getItem(k); } catch(e){ return mem[k] ?? null; } },
-  set(k,v){ try { localStorage.setItem(k,v); } catch(e){ mem[k]=v; } }
+  const maxBars = ivl==="5min"?78:ivl==="15min"?390:ivl==="30min"?240:ivl==="4h"?150:apiIvl==="60min"?480:130;
+  return mapped.slice(-maxBars);
+}
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+const DEFAULT_WATCHLIST = {
+  forex:  ["EURUSD","GBPUSD","USDJPY","GBPJPY","AUDUSD"],
+  metals: ["XAUUSD","XAGUSD"],
+  stocks: ["AAPL","NVDA","TSLA"],
+};
+const MARKET_INFO = {
+  forex:  { label:"Forex",  color:"#3B82F6", hint:"6-char pairs e.g. EURUSD, GBPJPY" },
+  metals: { label:"Metals", color:"#F59E0B", hint:"Gold=XAUUSD · Silver=XAGUSD" },
+  stocks: { label:"Stocks", color:"#10B981", hint:"US tickers e.g. AAPL, NVDA" },
+};
+const INTERVALS = [
+  { key:"daily", label:"Daily",  note:"~6 months" },
+  { key:"4h",    label:"4 hr",   note:"~1 month · built from hourly" },
+  { key:"60min", label:"1 hr",   note:"~1 month" },
+  { key:"30min", label:"30 min", note:"~10 days" },
+  { key:"15min", label:"15 min", note:"~5 days" },
+  { key:"5min",  label:"5 min",  note:"~1 day" },
+];
+const REFRESH_OPTS = [{key:0,label:"Off"},{key:60,label:"1 min"},{key:300,label:"5 min"},{key:900,label:"15 min"}];
+const SIG_STYLE = {
+  BUY:       {label:"BUY",    color:"#10B981",bg:"#052E16",border:"#10B98150"},
+  SELL:      {label:"SELL",   color:"#EF4444",bg:"#450A0A",border:"#EF444450"},
+  HOLD_BULL: {label:"HOLD ↑", color:"#F59E0B",bg:"#1C1208",border:"#F59E0B50"},
+  HOLD_BEAR: {label:"HOLD ↓", color:"#F59E0B",bg:"#1C1208",border:"#F59E0B50"},
 };
 
-/* ---------- config ---------- */
-const PAIRS = [
-  { sym:'EUR/USD', dp:5, pip:0.0001, unit:'pips' },
-  { sym:'GBP/USD', dp:5, pip:0.0001, unit:'pips' },
-  { sym:'GBP/JPY', dp:3, pip:0.01,   unit:'pips' },
-  { sym:'USD/JPY', dp:3, pip:0.01,   unit:'pips' },
-  { sym:'EUR/JPY', dp:3, pip:0.01,   unit:'pips' },
-  { sym:'AUD/USD', dp:5, pip:0.0001, unit:'pips' },
-  { sym:'USD/CAD', dp:5, pip:0.0001, unit:'pips' },
-  { sym:'XAU/USD', dp:2, pip:0.1,    unit:'pts'  },
-  { sym:'XAG/USD', dp:3, pip:0.01,   unit:'pts'  }
-];
-/* Focus pairs scanned by the "Scan focus pairs" button */
-const FOCUS = ['GBP/JPY','XAU/USD','USD/JPY','EUR/USD'];
-const TFS = ['5min','15min','1h'];
-let selPair = store.get('pair') || 'EUR/USD';
-let selTf   = store.get('tf')   || '15min';
+// ─── SVG CHART (no external chart lib — bulletproof) ─────────────────────────
+function PriceChart({ data, dec, intraday }) {
+  const W = 920, H = 320, padL = 64, padR = 16, padT = 14, padB = 28;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  const vals = [];
+  data.forEach(d => { vals.push(d.close); if(d.ema9!=null)vals.push(d.ema9); if(d.ema15!=null)vals.push(d.ema15); });
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max-min)||1;
+  const x = i => padL + (i/(data.length-1))*plotW;
+  const y = v => padT + (1-(v-min)/range)*plotH;
+  const path = key => data.map((d,i)=> d[key]==null?null:`${x(i).toFixed(1)},${y(d[key]).toFixed(1)}`)
+    .filter(Boolean).reduce((s,p,i)=> s + (i===0?`M${p}`:`L${p}`), "");
+  const yTicks = 5;
+  const tickVals = Array.from({length:yTicks+1}, (_,i)=> min + (range*i/yTicks));
+  const xStep = Math.max(1, Math.floor(data.length/7));
 
-/* ---------- discipline guardrails ---------- */
-/* UK/US market holidays that thin out liquidity. Update yearly. */
-const HOLIDAYS = [
-  { date:'2026-01-01', label:"New Year's Day" },
-  { date:'2026-01-19', label:'US Martin Luther King Jr. Day' },
-  { date:'2026-02-16', label:'US Presidents Day' },
-  { date:'2026-04-03', label:'Good Friday' },
-  { date:'2026-04-06', label:'UK Easter Monday' },
-  { date:'2026-05-04', label:'UK Early May bank holiday' },
-  { date:'2026-05-25', label:'UK Spring bank holiday / US Memorial Day' },
-  { date:'2026-06-19', label:'US Juneteenth' },
-  { date:'2026-07-03', label:'US Independence Day (observed)' },
-  { date:'2026-08-31', label:'UK Summer bank holiday' },
-  { date:'2026-09-07', label:'US Labor Day' },
-  { date:'2026-11-26', label:'US Thanksgiving' },
-  { date:'2026-11-27', label:'US Thanksgiving (half day)' },
-  { date:'2026-12-25', label:'Christmas Day' },
-  { date:'2026-12-28', label:'Boxing Day (observed)' }
-];
-const TRADE_WINDOW = { startH:8, startM:30, endH:17, endM:0 };
-let windowOverride = false;
-
-function todayISO(){
-  const d = new Date();
-  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-}
-function checkHoliday(){
-  const iso = todayISO();
-  return HOLIDAYS.find(h => h.date === iso) || null;
-}
-function inTradingWindow(){
-  const d = new Date();
-  const mins = d.getHours()*60 + d.getMinutes();
-  const start = TRADE_WINDOW.startH*60 + TRADE_WINDOW.startM;
-  const end = TRADE_WINDOW.endH*60 + TRADE_WINDOW.endM;
-  return mins >= start && mins <= end;
-}
-function renderGuard(){
-  const box = document.getElementById('guardBanners');
-  if (!box) return;
-  let html = '';
-  const hol = checkHoliday();
-  if (hol){
-    html += `<div class="gbanner holiday">⚠ <b>${hol.label}</b> today — expect thin, choppy conditions. Consider standing aside per your rules.</div>`;
-  }
-  const inWindow = inTradingWindow();
-  if (!inWindow && !windowOverride){
-    html += `<div class="gbanner time">⏳ Outside your 8:30am–5pm trading window — signals may reflect thin trading.<button class="glink" onclick="overrideWindow()">Check anyway</button></div>`;
-  } else if (!inWindow && windowOverride){
-    html += `<div class="gbanner time">⏳ Outside trading window — override active for this session.</div>`;
-  }
-  box.innerHTML = html;
-  const disable = !inWindow && !windowOverride;
-  const aBtn = document.getElementById('analyseBtn');
-  const sBtn = document.getElementById('scanBtn');
-  if (aBtn) aBtn.disabled = disable;
-  if (sBtn) sBtn.disabled = disable;
-}
-function overrideWindow(){
-  windowOverride = true;
-  renderGuard();
-}
-
-/* ---------- indicators ---------- */
-function ema(vals, p){
-  const out = new Array(vals.length).fill(null);
-  if (vals.length < p) return out;
-  let s = 0; for (let i=0;i<p;i++) s += vals[i];
-  out[p-1] = s/p;
-  const k = 2/(p+1);
-  for (let i=p;i<vals.length;i++) out[i] = vals[i]*k + out[i-1]*(1-k);
-  return out;
-}
-function atr(c, p=14){
-  const out = new Array(c.length).fill(null);
-  if (c.length < p+1) return out;
-  const tr = [null];
-  for (let i=1;i<c.length;i++){
-    tr.push(Math.max(
-      c[i].h - c[i].l,
-      Math.abs(c[i].h - c[i-1].c),
-      Math.abs(c[i].l - c[i-1].c)
-    ));
-  }
-  let s=0; for (let i=1;i<=p;i++) s += tr[i];
-  out[p] = s/p;
-  for (let i=p+1;i<c.length;i++) out[i] = (out[i-1]*(p-1) + tr[i]) / p;
-  return out;
-}
-
-/* ---------- signal engine ---------- */
-function buildSignal(candles, rr){
-  const closes = candles.map(c=>c.c);
-  const e9  = ema(closes, 9);
-  const e15 = ema(closes, 15);
-  const a   = atr(candles, 14);
-  const n = candles.length - 1;
-
-  // find most recent crossover
-  let crossIdx = -1, crossDir = 0;
-  for (let i=n; i>15; i--){
-    const now  = Math.sign(e9[i]  - e15[i]);
-    const prev = Math.sign(e9[i-1]- e15[i-1]);
-    if (now !== 0 && prev !== 0 && now !== prev){ crossIdx = i; crossDir = now; break; }
-  }
-  const barsSince = crossIdx === -1 ? Infinity : n - crossIdx;
-  const price = closes[n];
-  const A = a[n];
-  const slDist = 1.5 * A;
-  const tpDist = slDist * rr;
-
-  let verdict, why, dir = null;
-  const trend = e9[n] > e15[n] ? 'up' : 'down';
-
-  if (barsSince <= 3 && crossDir === 1){
-    verdict='BUY'; dir='buy';
-    why = `9 EMA crossed above 15 EMA ${barsSince} candle${barsSince===1?'':'s'} ago — fresh long signal`;
-  } else if (barsSince <= 3 && crossDir === -1){
-    verdict='SELL'; dir='sell';
-    why = `9 EMA crossed below 15 EMA ${barsSince} candle${barsSince===1?'':'s'} ago — fresh short signal`;
-  } else {
-    verdict='HOLD'; dir='hold';
-    why = trend==='up'
-      ? `Uptrend continuing — last crossover was ${barsSince} candles ago. No fresh entry; wait for the next cross.`
-      : `Downtrend continuing — last crossover was ${barsSince} candles ago. No fresh entry; wait for the next cross.`;
-  }
-
-  const long = dir === 'buy';
-  return {
-    verdict, dir, why, price, atr:A, barsSince, crossIdx, trend,
-    sl: dir==='hold' ? null : (long ? price - slDist : price + slDist),
-    tp: dir==='hold' ? null : (long ? price + tpDist : price - tpDist),
-    slDist, tpDist, e9, e15
-  };
-}
-
-/* ---------- data fetch ---------- */
-async function fetchCandles(sym, tf, key){
-  const url = `https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=${tf}&outputsize=120&timezone=UTC&apikey=${encodeURIComponent(key)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (data.status === 'error' || !data.values) throw new Error(data.message || 'No data returned');
-  return data.values.map(v => ({
-    t: v.datetime, o:+v.open, h:+v.high, l:+v.low, c:+v.close
-  })).reverse();
-}
-
-/* ---------- chart ---------- */
-function renderChart(candles, sig, pair){
-  const view = candles.slice(-60);
-  const off = candles.length - view.length;
-  const W=360, H=190, padL=6, padR=44, padT=8, padB=10;
-  const hi = Math.max(...view.map(c=>c.h));
-  const lo = Math.min(...view.map(c=>c.l));
-  const y = v => padT + (hi - v) / (hi - lo || 1) * (H - padT - padB);
-  const x = i => padL + i * ((W - padL - padR) / view.length);
-  const cw = Math.max(2, (W - padL - padR)/view.length - 2);
-
-  let bars='';
-  view.forEach((c,i)=>{
-    const col = c.c >= c.o ? 'var(--buy)' : 'var(--sell)';
-    const bx = x(i)+cw/2;
-    bars += `<line x1="${bx}" y1="${y(c.h)}" x2="${bx}" y2="${y(c.l)}" stroke="${col}" stroke-width="1" opacity=".55"/>`;
-    bars += `<rect x="${x(i)}" y="${Math.min(y(c.o),y(c.c))}" width="${cw}" height="${Math.max(1,Math.abs(y(c.o)-y(c.c)))}" fill="${col}" opacity=".85"/>`;
-  });
-
-  const line = (arr, col) => {
-    let d='';
-    view.forEach((c,i)=>{
-      const v = arr[off+i];
-      if (v==null) return;
-      d += (d?'L':'M') + (x(i)+cw/2).toFixed(1) + ',' + y(v).toFixed(1);
-    });
-    return `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.6"/>`;
-  };
-
-  let cross='';
-  if (sig.crossIdx >= off){
-    const i = sig.crossIdx - off;
-    cross = `<circle cx="${x(i)+cw/2}" cy="${y(sig.e9[sig.crossIdx])}" r="5" fill="none" stroke="var(--text)" stroke-width="1.5"/>`;
-  }
-
-  const last = view[view.length-1].c;
-  const lbl = `<text x="${W-padR+4}" y="${y(last)+4}" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono">${last.toFixed(pair.dp)}</text>`;
-
-  return `
-  <div class="chartwrap">
-    <div class="cap">
-      <span>${selPair} · ${selTf} · last ${view.length} candles</span>
-      <span class="legend"><i style="background:#7FB4FF"></i>EMA 9 &nbsp;<i style="background:#C792EA"></i>EMA 15</span>
-    </div>
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Price chart with EMAs">
-      ${bars}${line(sig.e9,'#7FB4FF')}${line(sig.e15,'#C792EA')}${cross}${lbl}
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:"100%",height:"auto",display:"block"}}>
+      {tickVals.map((tv,i)=>(
+        <g key={i}>
+          <line x1={padL} y1={y(tv)} x2={W-padR} y2={y(tv)} stroke="#1E293B" strokeWidth="1" strokeDasharray="3 3"/>
+          <text x={padL-8} y={y(tv)+3} fill="#475569" fontSize="9" textAnchor="end" fontFamily="monospace">{tv.toFixed(dec>3?dec-2:dec)}</text>
+        </g>
+      ))}
+      {data.map((d,i)=> i%xStep===0 ? (
+        <text key={i} x={x(i)} y={H-8} fill="#475569" fontSize="9" textAnchor="middle" fontFamily="monospace">{intraday ? (d.date?.slice(5,16).replace(" ","·")) : d.date?.slice(5,10)}</text>
+      ) : null)}
+      <path d={path("close")} fill="none" stroke="#2563EB" strokeWidth="1" opacity="0.5"/>
+      <path d={path("ema9")}  fill="none" stroke="#3B82F6" strokeWidth="2"/>
+      <path d={path("ema15")} fill="none" stroke="#A78BFA" strokeWidth="2"/>
     </svg>
-  </div>`;
+  );
 }
 
-/* ---------- signal page ---------- */
-function fmtDist(d, pair){
-  return (d / pair.pip).toFixed(1) + ' ' + pair.unit;
+function StatCard({label,value,color,sub}) {
+  return (
+    <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:10,padding:"12px 16px",flex:1,minWidth:100}}>
+      <div style={{color:"#64748B",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:5}}>{label}</div>
+      <div style={{color:color||"#E2E8F0",fontSize:19,fontWeight:700,fontFamily:"monospace"}}>{value}</div>
+      {sub&&<div style={{color:"#475569",fontSize:11,marginTop:2}}>{sub}</div>}
+    </div>
+  );
 }
-let lastSig = null;
 
-function renderSignal(sig, pair){
-  lastSig = { sig, pairObj: pair, pair: pair.sym, tf: selTf };
-  const f = v => v.toFixed(pair.dp);
-  let ladder = '';
-  if (sig.dir !== 'hold'){
-    const rows = sig.dir==='buy'
-      ? [['tp','Take profit',sig.tp,'+'+fmtDist(sig.tpDist,pair)],['entry','Entry',sig.price,''],['sl','Stop loss',sig.sl,'−'+fmtDist(sig.slDist,pair)]]
-      : [['tp','Take profit',sig.tp,'−'+fmtDist(sig.tpDist,pair)],['entry','Entry',sig.price,''],['sl','Stop loss',sig.sl,'+'+fmtDist(sig.slDist,pair)]];
-    ladder = `<div class="ladder">` + rows.map(r=>`
-      <div class="rung ${r[0]}">
-        <div class="lab">${r[1]}</div>
-        <div class="price mono">${f(r[2])}</div>
-        <div class="dist mono">${r[3]}</div>
-      </div>`).join('') + `</div>
-      <button class="primary logbtn" id="logTriggerBtn" onclick="openLogChecklist()">Log to journal</button>
-      <div id="logChecklist"></div>`;
-  } else {
-    ladder = `<div class="ladder">
-      <div class="rung entry"><div class="lab">Price</div><div class="price mono">${f(sig.price)}</div><div class="dist"></div></div>
-    </div>`;
-  }
-  document.getElementById('signalOut').innerHTML = `
-    <div class="verdict ${sig.dir}">
-      <div class="verdict-head">
-        <div class="verdict-tag ${sig.dir}">${sig.verdict}</div>
-        <div class="verdict-why">${sig.why}</div>
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+function EMATrader() {
+  const [keyInput, setKeyInput] = useState("");
+  const [keySaved, setKeySaved] = useState(false);
+  const savedKeyRef = useRef("");
+
+  const [marketTab, setMarketTab] = useState("forex");
+  const [watchlist, setWatchlist] = useState(DEFAULT_WATCHLIST);
+  const [pairInput, setPairInput] = useState("");
+  const [active, setActive] = useState(null);
+  const [ivl, setIvl] = useState("daily");
+  const [refresh, setRefresh] = useState(0);
+  const [countdown, setCountdown] = useState(0);
+  const [callCount, setCallCount] = useState(0);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [chartData, setChartData] = useState([]);
+  const [signal, setSignal] = useState(null);
+  const [backtest, setBacktest] = useState(null);
+  const [lastFetch, setLastFetch] = useState(null);
+  const [elapsed, setElapsed] = useState(0);
+  const [tab, setTab] = useState("chart");
+  const [tradeFilter, setTradeFilter] = useState("ALL");
+  const [mtfOn, setMtfOn] = useState(true);      // 4h trend filter on/off
+  const [trend4h, setTrend4h] = useState(null);  // {dir:"bull"|"bear", ema9, ema15, date}
+
+  const timerRef=useRef(null), elapsedR=useRef(null), cdR=useRef(null), ivlRef=useRef(ivl);
+  const mtfRef=useRef(mtfOn);
+  useEffect(()=>{ ivlRef.current=ivl; },[ivl]);
+  useEffect(()=>{ mtfRef.current=mtfOn; },[mtfOn]);
+
+  // Timeframes below 4h, where a 4h trend filter is meaningful
+  const SUB_4H = ["5min","15min","30min","60min"];
+
+  const saveKey = () => {
+    const k = keyInput.trim();
+    if (!k) return;
+    savedKeyRef.current = k;
+    setKeySaved(true);
+  };
+
+  const doFetch = useCallback(async (sym, interval) => {
+    const key = savedKeyRef.current;
+    if (!key) { setError("No API key saved. Enter your key and click Save Key."); return; }
+    if (!sym) { setError("No pair selected."); return; }
+    setLoading(true); setError("");
+    try {
+      const raw = await fetchPriceData(sym, interval, key);
+      setCallCount(c=>c+1);
+      const closes=raw.map(d=>d.close), highs=raw.map(d=>d.high), lows=raw.map(d=>d.low);
+      const e9=calcEMA(closes,9), e15=calcEMA(closes,15), atrs=calcATR(highs,lows,closes,14);
+      const dec=pairDecimals(sym);
+      const combined=raw.map((d,i)=>({...d,sym,ema9:e9[i]!=null?+e9[i].toFixed(dec+2):null,ema15:e15[i]!=null?+e15[i].toFixed(dec+2):null}));
+      setChartData(combined);
+      const li=combined.length-1, cur=combined[li], prv=combined[li-1], atr=atrs[li]??0;
+      let sigType;
+      if (cur.ema9>cur.ema15&&prv?.ema9!=null&&prv.ema9<=(prv?.ema15??prv.ema9)) sigType="BUY";
+      else if (cur.ema9<cur.ema15&&prv?.ema9!=null&&prv.ema9>=(prv?.ema15??prv.ema9)) sigType="SELL";
+      else sigType=cur.ema9>cur.ema15?"HOLD_BULL":"HOLD_BEAR";
+      setSignal({type:sigType,sym,price:cur.close,ema9:cur.ema9,ema15:cur.ema15,
+        tp:+(cur.close+atr*3).toFixed(dec+2),sl:+(cur.close-atr*1.5).toFixed(dec+2),
+        atr:+atr.toFixed(dec+2),date:cur.date,dec});
+      const bt=runBacktest(combined,e9,e15,atrs);
+      const wins=bt.trades.filter(t=>t.result==="WIN").length, losses=bt.trades.length-wins;
+      const avgW=bt.trades.filter(t=>t.result==="WIN").reduce((s,t)=>s+t.pnlPct,0)/(wins||1);
+      const avgL=bt.trades.filter(t=>t.result==="LOSS").reduce((s,t)=>s+t.pnlPct,0)/(losses||1);
+      setBacktest({...bt,wins,losses,total:bt.trades.length,
+        winRate:bt.trades.length?((wins/bt.trades.length)*100).toFixed(1):"0",
+        totalRet:(((bt.finalCapital-10000)/10000)*100).toFixed(2),
+        avgWin:+avgW.toFixed(2),avgLoss:+avgL.toFixed(2)});
+      setLastFetch(Date.now()); setElapsed(0);
+
+      // ── 4h trend filter (second call, only on sub-4h timeframes) ──
+      if (mtfRef.current && SUB_4H.includes(interval)) {
+        try {
+          const raw4h = await fetchPriceData(sym, "4h", key);
+          setCallCount(c=>c+1);
+          const cl4 = raw4h.map(d=>d.close);
+          const e9_4 = calcEMA(cl4,9), e15_4 = calcEMA(cl4,15);
+          const j = cl4.length-1;
+          if (e9_4[j]!=null && e15_4[j]!=null) {
+            setTrend4h({
+              dir: e9_4[j] > e15_4[j] ? "bull" : "bear",
+              ema9: e9_4[j], ema15: e15_4[j], date: raw4h[j].date,
+            });
+          } else setTrend4h(null);
+        } catch(e) {
+          setTrend4h({ error: e.message });   // show a soft note, don't fail the main load
+        }
+      } else {
+        setTrend4h(null);
+      }
+    } catch(e) { setError(e.message); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(()=>{
+    clearInterval(elapsedR.current);
+    if (!lastFetch) return;
+    elapsedR.current=setInterval(()=>setElapsed(Math.floor((Date.now()-lastFetch)/1000)),1000);
+    return ()=>clearInterval(elapsedR.current);
+  },[lastFetch]);
+  useEffect(()=>{
+    clearInterval(timerRef.current); clearInterval(cdR.current);
+    if (refresh===0||!active){setCountdown(0);return;}
+    setCountdown(refresh);
+    cdR.current=setInterval(()=>setCountdown(c=>c<=1?refresh:c-1),1000);
+    timerRef.current=setInterval(()=>doFetch(active,ivlRef.current),refresh*1000);
+    return ()=>{clearInterval(timerRef.current);clearInterval(cdR.current);};
+  },[refresh,active,doFetch]);
+
+  const switchPair = (sym, interval) => {
+    if (!savedKeyRef.current) { setError("Enter and Save your API key first."); return; }
+    setActive(sym); setTab("chart"); setSignal(null); setChartData([]); setBacktest(null); setError("");
+    doFetch(sym, interval||ivl);
+  };
+  const changeInterval = (n) => { setIvl(n); if(active&&savedKeyRef.current) doFetch(active,n); };
+  const addPair = () => {
+    const t=pairInput.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if (!t) return;
+    const mkt=isForexPair(t)?(["XAU","XAG","XPT","XPD"].some(m=>t.startsWith(m))?"metals":"forex"):"stocks";
+    setWatchlist(w=>({...w,[mkt]:w[mkt].includes(t)?w[mkt]:[...w[mkt],t]}));
+    setMarketTab(mkt); setPairInput(""); switchPair(t,ivl);
+  };
+  const removePair = (sym,mkt,e)=>{
+    e.stopPropagation();
+    setWatchlist(w=>({...w,[mkt]:w[mkt].filter(x=>x!==sym)}));
+    if(active===sym){setActive(null);setSignal(null);setChartData([]);setBacktest(null);}
+  };
+
+  const sigStyle = signal?SIG_STYLE[signal.type]:null;
+  const dec = signal?.dec??4;
+  const filtered = backtest?.trades.filter(t=>tradeFilter==="ALL"||t.result===tradeFilter)??[];
+
+  return (
+    <div style={{minHeight:"100vh",background:"#060B18",fontFamily:"'Inter',system-ui,sans-serif",color:"#E2E8F0",display:"flex",flexDirection:"column"}}>
+      <div style={{background:"#0A1020",borderBottom:"1px solid #1E293B",padding:"12px 20px",display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:2}}>
+            <div style={{width:7,height:7,borderRadius:"50%",background:keySaved?"#10B981":"#F59E0B",boxShadow:keySaved?"0 0 6px #10B981":"0 0 6px #F59E0B"}}/>
+            <span style={{fontFamily:"monospace",color:keySaved?"#10B981":"#F59E0B",fontSize:10,letterSpacing:"0.15em"}}>{keySaved?"CONNECTED · ALPHA VANTAGE":"AWAITING API KEY"}</span>
+          </div>
+          <div style={{fontSize:17,fontWeight:800,color:"#F1F5F9"}}>9 / 15 EMA · Forex &amp; Commodities</div>
+        </div>
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          {!keySaved ? (
+            <React.Fragment>
+              <input value={keyInput} onChange={e=>setKeyInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveKey()}
+                placeholder="Paste Alpha Vantage API key" type="password"
+                style={{padding:"7px 12px",background:"#111827",border:"1px solid #374151",borderRadius:7,color:"#E2E8F0",fontSize:13,width:250,outline:"none"}}/>
+              <button onClick={saveKey} style={{padding:"7px 16px",background:"#1D4ED8",border:"none",borderRadius:7,color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer"}}>Save Key</button>
+              <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noreferrer" style={{color:"#3B82F6",fontSize:12}}>Get free key →</a>
+            </React.Fragment>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{color:"#10B981",fontSize:12,fontWeight:600}}>✓ Key saved</span>
+              <button onClick={()=>{setKeySaved(false);setKeyInput("");savedKeyRef.current="";}} style={{padding:"4px 10px",background:"transparent",border:"1px solid #1E293B",borderRadius:5,color:"#64748B",fontSize:11,cursor:"pointer"}}>Change</button>
+              <span style={{color:"#334155",fontSize:12,fontFamily:"monospace"}}>{callCount}/25 calls used</span>
+            </div>
+          )}
+        </div>
       </div>
-      ${ladder}
-      <div class="meta">
-        <span class="pill mono">ATR(14) ${sig.atr.toFixed(pair.dp)}</span>
-        <span class="pill">SL 1.5×ATR</span>
-        <span class="pill">R:R 1:${getRR()}</span>
-        <span class="pill">Trend: ${sig.trend}</span>
+
+      <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+        <div style={{width:172,background:"#0A1020",borderRight:"1px solid #1E293B",display:"flex",flexDirection:"column",padding:"14px 10px",gap:4,flexShrink:0,overflowY:"auto"}}>
+          <div style={{display:"flex",gap:3,marginBottom:8}}>
+            {Object.entries(MARKET_INFO).map(([k,m])=>(
+              <button key={k} onClick={()=>setMarketTab(k)} style={{flex:1,padding:"4px 0",borderRadius:5,border:"1px solid",borderColor:marketTab===k?m.color+"60":"#1E293B",background:marketTab===k?m.color+"18":"transparent",color:marketTab===k?m.color:"#475569",fontSize:9,fontWeight:700,cursor:"pointer"}}>{m.label}</button>
+            ))}
+          </div>
+          <div style={{color:"#334155",fontSize:10,marginBottom:8}}>{MARKET_INFO[marketTab].hint}</div>
+          {watchlist[marketTab].map(sym=>(
+            <div key={sym} onClick={()=>switchPair(sym,ivl)} style={{padding:"8px 10px",borderRadius:7,border:"1px solid",borderColor:active===sym?"#1D4ED8":"#1E293B",background:active===sym?"#1E3A5F":"#0F172A",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:keySaved?1:0.45}}>
+              <div>
+                <div style={{fontFamily:"monospace",fontWeight:700,fontSize:13,color:active===sym?"#93C5FD":"#E2E8F0"}}>{displaySym(sym)}</div>
+                {active===sym&&signal?.type&&<div style={{fontSize:9,color:SIG_STYLE[signal.type]?.color,marginTop:1}}>{SIG_STYLE[signal.type]?.label}</div>}
+              </div>
+              <span onClick={e=>removePair(sym,marketTab,e)} style={{color:"#334155",fontSize:15,cursor:"pointer",padding:"0 2px"}}>×</span>
+            </div>
+          ))}
+          <div style={{marginTop:6,display:"flex",gap:3}}>
+            <input value={pairInput} onChange={e=>setPairInput(e.target.value.toUpperCase())} onKeyDown={e=>e.key==="Enter"&&addPair()} placeholder="+ EURUSD…"
+              style={{flex:1,padding:"6px 7px",background:"#060B18",border:"1px dashed #1E293B",borderRadius:5,color:"#E2E8F0",fontSize:11,fontFamily:"monospace",outline:"none",minWidth:0}}/>
+            <button onClick={addPair} style={{padding:"6px 10px",background:"#1E293B",border:"none",borderRadius:5,color:"#93C5FD",fontSize:15,cursor:"pointer"}}>+</button>
+          </div>
+          <div style={{marginTop:"auto",paddingTop:12,borderTop:"1px solid #1E293B"}}>
+            <div style={{color:"#475569",fontSize:9,textTransform:"uppercase",letterSpacing:"0.12em",marginBottom:6}}>Candle Interval</div>
+            {INTERVALS.map(i=>(
+              <div key={i.key} onClick={()=>changeInterval(i.key)} style={{padding:"5px 8px",borderRadius:5,marginBottom:2,cursor:"pointer",background:ivl===i.key?"#1E3A5F":"transparent",color:ivl===i.key?"#93C5FD":"#64748B",fontSize:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <span>{i.label}</span>{ivl===i.key&&<span style={{fontSize:9,color:"#475569"}}>{i.note}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{flex:1,overflow:"auto",padding:18}}>
+          {error&&<div style={{background:"#450A0A",border:"1px solid #7F1D1D",borderRadius:8,padding:"12px 16px",color:"#FCA5A5",marginBottom:14,fontSize:13,lineHeight:1.5}}>⚠ {error}</div>}
+
+          {active&&(
+            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,flexWrap:"wrap"}}>
+              <div style={{fontFamily:"monospace",fontSize:17,fontWeight:800,color:"#F1F5F9"}}>{displaySym(active)}<span style={{color:"#334155",fontSize:12,fontWeight:400,marginLeft:8}}>{INTERVALS.find(i=>i.key===ivl)?.label}</span></div>
+              {lastFetch&&!loading&&<div style={{color:"#475569",fontSize:12}}>Updated {timeAgo(elapsed)}{refresh>0&&<span style={{color:"#334155"}}> · next in {countdown}s</span>}</div>}
+              <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                {SUB_4H.includes(ivl)&&(
+                  <button onClick={()=>{ const n=!mtfOn; setMtfOn(n); mtfRef.current=n; if(active&&savedKeyRef.current) doFetch(active,ivl); }}
+                    title="Fetch the 4h trend alongside this timeframe (uses a 2nd API call)"
+                    style={{padding:"4px 10px",borderRadius:5,border:"1px solid",borderColor:mtfOn?"#A78BFA60":"#1E293B",background:mtfOn?"#A78BFA18":"#0F172A",color:mtfOn?"#C4B5FD":"#64748B",fontSize:11,cursor:"pointer",fontWeight:600}}>
+                    4h filter: {mtfOn?"On":"Off"}
+                  </button>
+                )}
+                <span style={{color:"#64748B",fontSize:11}}>Auto-refresh:</span>
+                {REFRESH_OPTS.map(r=>(
+                  <button key={r.key} onClick={()=>setRefresh(r.key)} style={{padding:"4px 9px",borderRadius:5,border:"1px solid",borderColor:refresh===r.key?"#1D4ED8":"#1E293B",background:refresh===r.key?"#1E3A5F":"#0F172A",color:refresh===r.key?"#93C5FD":"#64748B",fontSize:11,cursor:"pointer",fontWeight:refresh===r.key?600:400}}>{r.label}</button>
+                ))}
+                <button onClick={()=>doFetch(active,ivl)} disabled={loading||!keySaved} style={{padding:"5px 14px",background:loading||!keySaved?"#1E293B":"#1D4ED8",border:"none",borderRadius:6,color:"#fff",fontSize:12,fontWeight:600,cursor:loading||!keySaved?"not-allowed":"pointer"}}>{loading?"Loading…":"↻ Refresh"}</button>
+              </div>
+            </div>
+          )}
+
+          {active&&ivl!=="daily"&&<div style={{background:"#1C1208",border:"1px solid #F59E0B30",borderRadius:7,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#D97706"}}>⚡ {INTERVALS.find(i=>i.key===ivl)?.label} candles = {(mtfOn&&SUB_4H.includes(ivl))?"2 API calls":"1 API call"} per refresh{(mtfOn&&SUB_4H.includes(ivl))?" (1 for this timeframe + 1 for the 4h filter)":""}. Free tier: 25/day, 5/min.</div>}
+
+          {loading&&<div style={{textAlign:"center",padding:"50px 20px"}}><div style={{fontFamily:"monospace",color:"#3B82F6",fontSize:13}}>Fetching {displaySym(active||"")} · {INTERVALS.find(i=>i.key===ivl)?.label}…</div></div>}
+
+          {!loading&&!active&&(
+            <div style={{textAlign:"center",padding:"60px 20px",color:"#334155"}}>
+              <div style={{fontSize:40,marginBottom:14}}>💱</div>
+              {!keySaved ? (
+                <React.Fragment>
+                  <div style={{fontSize:16,fontWeight:600,color:"#475569",marginBottom:8}}>Step 1: Save your API key above</div>
+                  <div style={{fontSize:13,color:"#334155",marginBottom:6}}>Free key at alphavantage.co — 30 seconds.</div>
+                  <div style={{fontSize:12,color:"#1E3A5F"}}>Free tier: 25 calls/day · 5 calls/min</div>
+                </React.Fragment>
+              ) : (
+                <React.Fragment>
+                  <div style={{fontSize:16,fontWeight:600,color:"#475569",marginBottom:8}}>Step 2: Pick a pair from the sidebar</div>
+                  <div style={{display:"flex",gap:8,justifyContent:"center",marginTop:12,flexWrap:"wrap"}}>
+                    {["XAUUSD","GBPUSD","EURUSD","GBPJPY"].map(s=>(
+                      <div key={s} onClick={()=>switchPair(s,ivl)} style={{padding:"6px 14px",background:"#0F172A",border:"1px solid #1E293B",borderRadius:20,cursor:"pointer",fontFamily:"monospace",fontSize:12,color:"#64748B"}}>{displaySym(s)}</div>
+                    ))}
+                  </div>
+                </React.Fragment>
+              )}
+            </div>
+          )}
+
+          {!loading&&signal&&sigStyle&&(
+            <React.Fragment>
+              <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+                <div style={{background:sigStyle.bg,border:`1px solid ${sigStyle.border}`,borderRadius:12,padding:"14px 20px",minWidth:140,flexShrink:0}}>
+                  <div style={{color:"#64748B",fontSize:10,textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:5}}>Signal</div>
+                  <div style={{color:sigStyle.color,fontSize:30,fontWeight:900,fontFamily:"monospace"}}>{sigStyle.label}</div>
+                  <div style={{color:"#475569",fontSize:10,marginTop:3}}>{signal.date?.slice(0,16)}</div>
+                </div>
+                <StatCard label="Price" value={fmt(signal.price,dec)}/>
+                <StatCard label="EMA 9" value={fmt(signal.ema9,dec)} color="#3B82F6" sub="Fast"/>
+                <StatCard label="EMA 15" value={fmt(signal.ema15,dec)} color="#A78BFA" sub="Slow"/>
+                <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:10,padding:"12px 16px",flex:1,minWidth:140}}>
+                  <div style={{color:"#64748B",fontSize:10,textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:8}}>Take Profit / Stop Loss</div>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{color:"#10B981",fontSize:12,fontWeight:600}}>▲ TP</span><span style={{color:"#10B981",fontFamily:"monospace",fontSize:14,fontWeight:700}}>{fmt(signal.tp,dec)}</span></div>
+                  <div style={{display:"flex",justifyContent:"space-between"}}><span style={{color:"#EF4444",fontSize:12,fontWeight:600}}>▼ SL</span><span style={{color:"#EF4444",fontFamily:"monospace",fontSize:14,fontWeight:700}}>{fmt(signal.sl,dec)}</span></div>
+                  <div style={{color:"#334155",fontSize:10,marginTop:5}}>ATR: {fmt(signal.atr,dec)} · 1:2 R:R</div>
+                </div>
+              </div>
+
+              {SUB_4H.includes(ivl)&&mtfOn&&trend4h&&(()=>{
+                if (trend4h.error) return (
+                  <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:8,padding:"10px 14px",marginBottom:12,fontSize:12,color:"#64748B"}}>
+                    4h trend filter unavailable: {trend4h.error}
+                  </div>
+                );
+                const mainBull = signal.type==="BUY"||signal.type==="HOLD_BULL";
+                const trendBull = trend4h.dir==="bull";
+                const aligned = mainBull===trendBull;
+                const isCross = signal.type==="BUY"||signal.type==="SELL";
+                const trendColor = trendBull?"#10B981":"#EF4444";
+                const barColor = aligned?"#10B981":"#EF4444";
+                const barBg = aligned?"#052E16":"#450A0A";
+                const trendWord = trendBull?"uptrend":"downtrend";
+                let verdict;
+                if (isCross && aligned)       verdict = `✓ ${sigStyle.label} agrees with the 4h ${trendWord} — higher-probability setup`;
+                else if (isCross && !aligned) verdict = `✗ ${sigStyle.label} is against the 4h ${trendWord} — most traders would skip this one`;
+                else if (aligned)             verdict = `Holding · the 4h ${trendWord} supports the current bias`;
+                else                          verdict = `Holding · current bias conflicts with the 4h ${trendWord}`;
+                return (
+                  <div style={{background:barBg,border:`1px solid ${barColor}40`,borderRadius:8,padding:"10px 14px",marginBottom:12,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
+                    <div style={{display:"flex",flexDirection:"column",gap:2,paddingRight:14,borderRight:"1px solid #1E293B"}}>
+                      <span style={{color:"#64748B",fontSize:9,textTransform:"uppercase",letterSpacing:"0.1em"}}>4h Trend</span>
+                      <span style={{color:trendColor,fontSize:16,fontWeight:800,fontFamily:"monospace"}}>{trendBull?"↑ Bullish":"↓ Bearish"}</span>
+                      <span style={{color:"#334155",fontSize:9}}>{trend4h.date?.slice(0,16)}</span>
+                    </div>
+                    <span style={{color:barColor,fontSize:13,fontWeight:600,flex:1,minWidth:200}}>{verdict}</span>
+                  </div>
+                );
+              })()}
+
+              {isForexPair(signal.sym)&&<div style={{background:"#0F1E35",border:"1px solid #1E3A5F",borderRadius:7,padding:"8px 12px",marginBottom:12,fontSize:11,color:"#64748B"}}>💡 TP/SL in price units. To pips: difference × {signal.sym.includes("JPY")?"100":"10,000"}.{signal.sym.includes("XAU")?"  Gold moves in USD per troy ounce.":""}</div>}
+
+              <div style={{display:"flex",gap:4,marginBottom:12}}>
+                {["chart","backtest","trades"].map(t=>(
+                  <button key={t} onClick={()=>setTab(t)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid",borderColor:tab===t?"#1D4ED8":"#1E293B",background:tab===t?"#1E3A5F":"#0F172A",color:tab===t?"#93C5FD":"#64748B",fontSize:12,fontWeight:600,cursor:"pointer"}}>{t==="backtest"?"Backtest":t==="trades"?"Trade Log":"Chart"}</button>
+                ))}
+              </div>
+
+              {tab==="chart"&&(
+                <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:12,padding:"16px 12px 12px"}}>
+                  <div style={{color:"#64748B",fontSize:11,marginBottom:8,paddingLeft:4}}>
+                    <span style={{color:"#3B82F6",fontWeight:600}}>— EMA 9</span>{"  "}<span style={{color:"#A78BFA",fontWeight:600}}>— EMA 15</span>{"  "}<span style={{color:"#334155"}}>{displaySym(signal.sym)} · {INTERVALS.find(i=>i.key===ivl)?.note}</span>
+                  </div>
+                  <PriceChart data={chartData} dec={dec} intraday={ivl!=="daily"}/>
+                </div>
+              )}
+
+              {tab==="backtest"&&backtest&&(
+                <div>
+                  <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap"}}>
+                    <StatCard label="Trades" value={backtest.total} sub={INTERVALS.find(i=>i.key===ivl)?.note}/>
+                    <StatCard label="Win Rate" value={`${backtest.winRate}%`} color={parseFloat(backtest.winRate)>=50?"#10B981":"#EF4444"} sub={`${backtest.wins}W / ${backtest.losses}L`}/>
+                    <StatCard label="Net Return" value={fmtPct(backtest.totalRet)} color={parseFloat(backtest.totalRet)>=0?"#10B981":"#EF4444"} sub={`$10k → ${fmtUSD(backtest.finalCapital)}`}/>
+                    <StatCard label="Max DD" value={`-${backtest.maxDrawdown}%`} color={backtest.maxDrawdown<10?"#10B981":backtest.maxDrawdown<20?"#F59E0B":"#EF4444"} sub="Drawdown"/>
+                    <StatCard label="Avg Win" value={fmtPct(backtest.avgWin)} color="#10B981" sub="Per win"/>
+                    <StatCard label="Avg Loss" value={fmtPct(backtest.avgLoss)} color="#EF4444" sub="Per loss"/>
+                  </div>
+                  <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:10,padding:16,fontSize:13,color:"#94A3B8",lineHeight:1.8}}>
+                    <div style={{color:"#E2E8F0",fontWeight:600,marginBottom:8}}>Simulation rules</div>
+                    <div>• <strong style={{color:"#3B82F6"}}>Entry:</strong> 9 EMA crosses above 15 EMA → buy at close · 95% capital</div>
+                    <div>• <strong style={{color:"#EF4444"}}>Stop Loss:</strong> Entry − 1.5× ATR(14)</div>
+                    <div>• <strong style={{color:"#10B981"}}>Take Profit:</strong> Entry + 3× ATR(14) · 1:2 R:R</div>
+                    <div>• <strong style={{color:"#A78BFA"}}>Signal Exit:</strong> 9 EMA crosses back below 15 EMA</div>
+                    <div style={{marginTop:10,color:"#475569",fontSize:11}}>⚠ Long-only. No spread/swap/slippage modelled. Past performance ≠ future results.</div>
+                  </div>
+                </div>
+              )}
+
+              {tab==="trades"&&backtest&&(
+                <div>
+                  <div style={{display:"flex",gap:6,marginBottom:10}}>
+                    {["ALL","WIN","LOSS"].map(f=>(
+                      <button key={f} onClick={()=>setTradeFilter(f)} style={{padding:"4px 10px",borderRadius:5,border:"1px solid",borderColor:tradeFilter===f?"#1D4ED8":"#1E293B",background:tradeFilter===f?"#1E3A5F":"#0F172A",color:tradeFilter===f?"#93C5FD":"#64748B",fontSize:11,fontWeight:600,cursor:"pointer"}}>{f==="WIN"?"✓ Wins":f==="LOSS"?"✗ Losses":"All"}</button>
+                    ))}
+                    <span style={{color:"#475569",fontSize:12,lineHeight:"26px"}}>{filtered.length} trades</span>
+                  </div>
+                  <div style={{background:"#0F172A",border:"1px solid #1E293B",borderRadius:10,overflow:"auto"}}>
+                    <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
+                      <thead><tr style={{borderBottom:"1px solid #1E293B"}}>
+                        {["#","Entry Date","Exit Date","Entry","Exit","TP","SL","P&L","%","Result","Exit Reason"].map(h=>(
+                          <th key={h} style={{padding:"8px 10px",textAlign:"left",color:"#475569",fontWeight:600,whiteSpace:"nowrap"}}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {filtered.length===0?<tr><td colSpan={11} style={{padding:20,color:"#475569",textAlign:"center"}}>No trades</td></tr>
+                        :filtered.map(t=>(
+                          <tr key={t.id} style={{borderBottom:"1px solid #0D1525"}}>
+                            <td style={{padding:"7px 10px",color:"#475569",fontFamily:"monospace"}}>{t.id}</td>
+                            <td style={{padding:"7px 10px",color:"#64748B",fontFamily:"monospace",whiteSpace:"nowrap"}}>{t.entryDate?.slice(0,10)}</td>
+                            <td style={{padding:"7px 10px",color:"#64748B",fontFamily:"monospace",whiteSpace:"nowrap"}}>{t.exitDate?.slice(0,10)}</td>
+                            <td style={{padding:"7px 10px",color:"#E2E8F0",fontFamily:"monospace"}}>{fmt(t.entry,dec)}</td>
+                            <td style={{padding:"7px 10px",color:"#E2E8F0",fontFamily:"monospace"}}>{fmt(t.exit,dec)}</td>
+                            <td style={{padding:"7px 10px",color:"#10B981",fontFamily:"monospace"}}>{fmt(t.tp,dec)}</td>
+                            <td style={{padding:"7px 10px",color:"#EF4444",fontFamily:"monospace"}}>{fmt(t.sl,dec)}</td>
+                            <td style={{padding:"7px 10px",fontFamily:"monospace",fontWeight:600,color:t.pnl>=0?"#10B981":"#EF4444"}}>{t.pnl>=0?"+":""}{fmtUSD(t.pnl)}</td>
+                            <td style={{padding:"7px 10px",fontFamily:"monospace",color:t.pnlPct>=0?"#10B981":"#EF4444"}}>{fmtPct(t.pnlPct)}</td>
+                            <td style={{padding:"7px 10px"}}><span style={{padding:"2px 6px",borderRadius:4,fontSize:10,fontWeight:700,background:t.result==="WIN"?"#052E16":"#450A0A",color:t.result==="WIN"?"#10B981":"#EF4444"}}>{t.result}</span></td>
+                            <td style={{padding:"7px 10px",color:"#475569",whiteSpace:"nowrap"}}>{t.reason}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </React.Fragment>
+          )}
+        </div>
       </div>
     </div>
-    ${renderChart(window.__candles, sig, pair)}`;
+  );
 }
 
-async function analyse(){
-  const key = store.get('apiKey');
-  const out = document.getElementById('signalOut');
-  if (!key){ out.innerHTML = `<div class="err">Add your Twelve Data API key on the Settings tab first.</div>`; return; }
-  const btn = document.getElementById('analyseBtn');
-  btn.disabled = true; btn.innerHTML = '<span class="spin"></span>Fetching…';
-  try{
-    const pair = PAIRS.find(p=>p.sym===selPair);
-    const candles = await fetchCandles(selPair, selTf, key);
-    window.__candles = candles;
-    const sig = buildSignal(candles, getRR());
-    renderSignal(sig, pair);
-  }catch(e){
-    out.innerHTML = `<div class="err">Couldn't fetch data: ${e.message}. Check your API key, connection, or rate limit (8 requests/min on the free tier).</div>`;
-  }finally{
-    btn.textContent = 'Analyse';
-    renderGuard();
-  }
-}
-
-/* ---------- journal ---------- */
-function getTrades(){ try { return JSON.parse(store.get('trades')||'[]'); } catch(e){ return []; } }
-function setTrades(t){ store.set('trades', JSON.stringify(t)); }
-
-function openLogChecklist(){
-  if (!lastSig || lastSig.sig.dir==='hold') return;
-  const s = lastSig.sig, pair = lastSig.pairObj;
-  const candles = window.__candles;
-  const last = candles[candles.length-1];
-  const tfMinutes = {'5min':5,'15min':15,'1h':60}[lastSig.tf] || 15;
-  const start = new Date(last.t.replace(' ','T')+'Z');
-  const end = new Date(start.getTime() + tfMinutes*60000);
-  const now = new Date();
-  const closed = now >= end;
-  const minsLeft = Math.ceil((end-now)/60000);
-  const minsAgo = Math.floor((now-end)/60000);
-
-  const candleRow = closed
-    ? `<div class="crow"><span class="ok">✓</span>&nbsp;Signal candle closed ${minsAgo<1?'just now':minsAgo+' min ago'}</div>`
-    : `<div class="crow"><span class="bad">⚠</span>&nbsp;Signal candle still forming — ${minsLeft} min left. Re-analyse once it closes before logging.</div>`;
-
-  document.getElementById('logTriggerBtn').style.display = 'none';
-  document.getElementById('logChecklist').innerHTML = `
-    <div class="checklist" id="checklistBody">
-      ${candleRow}
-      <span class="clab">Your actual fill price</span>
-      <input type="text" inputmode="decimal" id="fillPrice" value="${s.price.toFixed(pair.dp)}" oninput="updateSlipCheck()">
-      <div id="slipStatus"></div>
-      <div class="cbtns">
-        <button class="ghost" style="flex:1" onclick="cancelLogChecklist()">Cancel</button>
-        <button class="primary" id="confirmLogBtn" style="margin-top:0" ${closed?'':'disabled'} onclick="confirmLog()">Confirm & log</button>
-      </div>
-    </div>`;
-  updateSlipCheck();
-}
-
-function updateSlipCheck(){
-  if (!lastSig) return;
-  const s = lastSig.sig, pair = lastSig.pairObj;
-  const input = document.getElementById('fillPrice');
-  const el = document.getElementById('slipStatus');
-  if (!input || !el) return;
-  const fill = parseFloat(input.value);
-  if (isNaN(fill)){ el.innerHTML=''; return; }
-  const gap = Math.abs(fill - s.price);
-  const tolerance = 0.3 * s.atr; /* ~20% of the 1.5×ATR stop distance */
-  const gapDisp = (gap/pair.pip).toFixed(1)+' '+pair.unit;
-  if (gap <= tolerance){
-    el.innerHTML = `<div class="sliptok">✓ ${gapDisp} from printed entry — within tolerance</div>`;
-  } else {
-    el.innerHTML = `<div class="slipwarn">⚠ ${gapDisp} from printed entry — beyond your ~⅓ ATR tolerance. Consider skipping this one.</div>`;
-  }
-}
-
-function cancelLogChecklist(){
-  const cl = document.getElementById('logChecklist');
-  if (cl) cl.innerHTML = '';
-  const btn = document.getElementById('logTriggerBtn');
-  if (btn) btn.style.display = '';
-}
-
-function confirmLog(){
-  if (!lastSig || lastSig.sig.dir==='hold') return;
-  const s = lastSig.sig;
-  const input = document.getElementById('fillPrice');
-  const fill = input && !isNaN(parseFloat(input.value)) ? parseFloat(input.value) : s.price;
-  const t = getTrades();
-  t.unshift({
-    id: Date.now(), pair: lastSig.pair, tf: lastSig.tf, dir: s.dir,
-    entry: fill, sl: s.sl, tp: s.tp, rr: getRR(),
-    when: new Date().toISOString(), outcome: null
-  });
-  setTrades(t);
-  document.querySelector('nav button[data-page="journal"]').click();
-}
-
-function setOutcome(id, o){
-  const t = getTrades();
-  const tr = t.find(x=>x.id===id);
-  if (tr) tr.outcome = o;
-  setTrades(t);
-  renderJournal();
-}
-
-function renderJournal(){
-  const t = getTrades();
-  const closed = t.filter(x=>x.outcome && x.outcome!=='skip');
-  const wins = closed.filter(x=>x.outcome==='win').length;
-  const losses = closed.filter(x=>x.outcome==='loss').length;
-  const netR = closed.reduce((s,x)=> s + (x.outcome==='win'? +x.rr : x.outcome==='loss'? -1 : 0), 0);
-  const wr = closed.length ? Math.round(wins/closed.length*100) : 0;
-
-  document.getElementById('statsRow').innerHTML = `
-    <div class="stat"><b>${closed.length}</b><span>closed</span></div>
-    <div class="stat"><b>${wr}%</b><span>win rate</span></div>
-    <div class="stat"><b style="color:${netR>=0?'var(--buy)':'var(--sell)'}">${netR>=0?'+':''}${netR.toFixed(1)}R</b><span>net result</span></div>`;
-
-  const sd = store.get('startDate');
-  let prog = 'Set your paper trading start date in Settings to track your 4–6 month window.';
-  if (sd){
-    const days = Math.floor((Date.now() - new Date(sd).getTime())/86400000);
-    const months = (days/30.44).toFixed(1);
-    prog = `Paper trading for <b>${days} days</b> (~${months} months) of your 4–6 month evaluation. ${wins+losses} decided trades so far.`;
-  }
-  document.getElementById('paperProgress').innerHTML = prog;
-
-  const list = document.getElementById('tradeList');
-  if (!t.length){ list.innerHTML = `<div class="empty">No trades logged yet.<br>Run an analysis and tap “Log to journal” on a fresh signal.</div>`; return; }
-  list.innerHTML = t.map(x=>{
-    const d = new Date(x.when);
-    const when = d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' ' + d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-    const dp = (PAIRS.find(p=>p.sym===x.pair)||{dp:5}).dp;
-    const badge = x.outcome==='win' ? `<span class="badge win">WIN +${x.rr}R</span>`
-                : x.outcome==='loss'? `<span class="badge loss">LOSS −1R</span>`
-                : x.outcome==='be'  ? `<span class="badge be">BREAK-EVEN</span>`
-                : x.outcome==='skip'? `<span class="badge be">SKIPPED</span>` : '';
-    const btns = x.outcome ? '' : `
-      <div class="outcomes">
-        <button class="w" onclick="setOutcome(${x.id},'win')">Won</button>
-        <button class="l" onclick="setOutcome(${x.id},'loss')">Lost</button>
-        <button onclick="setOutcome(${x.id},'be')">B/E</button>
-        <button onclick="setOutcome(${x.id},'skip')">Skip</button>
-      </div>`;
-    return `<div class="trade">
-      <div class="top">
-        <span class="dir ${x.dir}">${x.dir.toUpperCase()} ${x.pair}</span>
-        ${badge || `<span class="when">${when} · ${x.tf}</span>`}
-      </div>
-      <div class="lvls mono">E ${x.entry.toFixed(dp)} · SL ${x.sl.toFixed(dp)} · TP ${x.tp.toFixed(dp)}</div>
-      ${btns}
-    </div>`;
-  }).join('');
-}
-
-/* ---------- settings ---------- */
-function getRR(){ return parseFloat(store.get('rr') || '1.5'); }
-function initSettings(){
-  document.getElementById('apiKey').value = store.get('apiKey') || '';
-  document.getElementById('rrSelect').value = String(getRR());
-  document.getElementById('startDate').value = store.get('startDate') || '';
-  document.getElementById('saveSettings').onclick = () => {
-    store.set('apiKey', document.getElementById('apiKey').value.trim());
-    store.set('rr', document.getElementById('rrSelect').value);
-    store.set('startDate', document.getElementById('startDate').value.trim());
-    const b = document.getElementById('saveSettings');
-    b.textContent = 'Saved ✓'; setTimeout(()=>b.textContent='Save settings', 1200);
-  };
-
-  let resetArmed = false;
-  document.getElementById('resetJournal').onclick = () => {
-    const b = document.getElementById('resetJournal');
-    if (!resetArmed){
-      resetArmed = true;
-      b.textContent = 'Tap again to confirm — this wipes all trades';
-      setTimeout(()=>{ resetArmed=false; b.innerHTML='Reset journal &amp; start date'; }, 4000);
-      return;
-    }
-    setTrades([]);
-    const today = todayISO();
-    store.set('startDate', today);
-    document.getElementById('startDate').value = today;
-    resetArmed = false;
-    b.textContent = 'Journal reset ✓';
-    setTimeout(()=>b.innerHTML='Reset journal &amp; start date', 1500);
-  };
-}
-
-/* ---------- shell ---------- */
-function renderChips(){
-  document.getElementById('pairChips').innerHTML = PAIRS.map(p=>
-    `<button class="chip ${p.sym===selPair?'on':''}" onclick="selPair='${p.sym}';store.set('pair',selPair);renderChips()">${p.sym}</button>`).join('');
-  document.getElementById('tfChips').innerHTML = TFS.map(t=>
-    `<button class="chip tf ${t===selTf?'on':''}" onclick="selTf='${t}';store.set('tf',selTf);renderChips()">${t}</button>`).join('');
-}
-document.querySelectorAll('nav button').forEach(b=>{
-  b.onclick = () => {
-    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('on'));
-    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-    b.classList.add('on');
-    document.getElementById('page-'+b.dataset.page).classList.add('active');
-    if (b.dataset.page==='journal') renderJournal();
-    if (b.dataset.page==='signal') renderGuard();
-  };
-});
-document.getElementById('analyseBtn').onclick = analyse;
-
-/* ---------- multi-pair scan ---------- */
-const sleep = ms => new Promise(r=>setTimeout(r,ms));
-const scanCache = {};
-
-async function scanAll(){
-  const key = store.get('apiKey');
-  const out = document.getElementById('signalOut');
-  if (!key){ out.innerHTML = `<div class="err">Add your Twelve Data API key on the Settings tab first.</div>`; return; }
-  const btn = document.getElementById('scanBtn');
-  btn.disabled = true;
-  out.innerHTML = `<div class="scanboard" id="scanboard"><div class="scanhint">Scanning ${FOCUS.length} pairs on ${selTf}…</div></div>`;
-  const board = document.getElementById('scanboard');
-
-  for (let i=0; i<FOCUS.length; i++){
-    const sym = FOCUS[i];
-    const pair = PAIRS.find(p=>p.sym===sym);
-    btn.innerHTML = `<span class="spin"></span>${sym} (${i+1}/${FOCUS.length})`;
-    try{
-      const candles = await fetchCandles(sym, selTf, key);
-      const sig = buildSignal(candles, getRR());
-      scanCache[sym] = { candles, sig };
-      const info = sig.dir==='hold'
-        ? `${sig.trend}trend · cross ${sig.barsSince} bars ago`
-        : `fresh cross · ${sig.barsSince} bar${sig.barsSince===1?'':'s'} ago`;
-      board.insertAdjacentHTML('beforeend', `
-        <div class="scanrow" onclick="openScan('${sym}')">
-          <span class="sym">${sym}</span>
-          <span class="info">${sig.price.toFixed(pair.dp)} · ${info}</span>
-          <span class="tag ${sig.dir}">${sig.verdict}</span>
-        </div>`);
-    }catch(e){
-      board.insertAdjacentHTML('beforeend', `
-        <div class="scanrow err-row">
-          <span class="sym">${sym}</span>
-          <span class="info">${e.message}</span>
-          <span class="tag">—</span>
-        </div>`);
-    }
-    if (i < FOCUS.length-1) await sleep(400);
-  }
-  board.insertAdjacentHTML('beforeend', `<div class="scanhint">Tap a pair for the chart, levels and journal logging.</div>`);
-  btn.textContent = 'Scan focus pairs';
-  renderGuard();
-}
-
-let lastScanHTML = null;
-
-function openScan(sym){
-  const hit = scanCache[sym];
-  if (!hit) return;
-  const out = document.getElementById('signalOut');
-  lastScanHTML = out.innerHTML;
-  selPair = sym; store.set('pair', sym); renderChips();
-  window.__candles = hit.candles;
-  renderSignal(hit.sig, PAIRS.find(p=>p.sym===sym));
-  out.insertAdjacentHTML('afterbegin',
-    `<button class="ghost back" onclick="backToScan()">&#8592; Back to scan results</button>`);
-  window.scrollTo({top:0});
-}
-
-function backToScan(){
-  if (lastScanHTML) document.getElementById('signalOut').innerHTML = lastScanHTML;
-}
-document.getElementById('scanBtn').onclick = scanAll;
-renderChips(); initSettings(); renderJournal(); renderGuard();
-setInterval(renderGuard, 60000);
+ReactDOM.createRoot(document.getElementById("root")).render(<EMATrader/>);
 </script>
 </body>
 </html>
